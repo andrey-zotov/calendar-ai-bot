@@ -35,8 +35,8 @@ Email → AWS SES → Lambda Function → OpenAI API → Calendar Invite → Ema
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/calendar-bot.git
-cd calendar-bot
+git clone git@github.com:andrey-zotov/calendar-ai-bot.git
+cd calendar-ai-bot
 ```
 
 ### 2. Install Dependencies
