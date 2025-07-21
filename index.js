@@ -251,8 +251,10 @@ If this email contains information about a meeting, event, or appointment, retur
   "duration": "PT1H" // ISO 8601 duration format
 }
 
-Note that today is ${new Date().toISOString().split('T')[0]}.
-With regards to the meeting date, if the email is not specific enough (e.g. year is not specified, or only weekday is given), pick the date in the future, which is closest to today.
+Important guidelines:
+- For the event title, use the email subject if it's descriptive and appropriate for a calendar event. If the subject is generic (like "Re: Meeting" or "FW: Question"), create a more descriptive title based on the email content.
+- Today is ${new Date().toISOString().split('T')[0]}.
+- With regards to the meeting date, if the email is not specific enough (e.g. year is not specified, or only weekday is given), pick the date in the future, which is closest to today.
 
 If no event information is found, return: {"hasEvent": false}
 

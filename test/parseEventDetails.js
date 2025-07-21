@@ -214,5 +214,68 @@ describe('index.js', function() {
         })
         .catch(done);
     });
+
+    it('should use descriptive email subject for event title', function(done) {
+      var data = {
+        emailData: 'Subject: Weekly Team Standup - Q4 Planning\\n\\nLets have our weekly standup tomorrow at 10 AM in conference room B.\\nWe will discuss Q4 planning and deliverables.',
+        config: {
+          openaiApiKey: 'test-api-key',
+          openaiModel: 'gpt-3.5-turbo',
+          maxTokens: 500
+        },
+        log: function() {},
+        // Mock HTTPS request with subject-based title response
+        httpsRequest: function(options, callback) {
+          const mockResponse = {
+            statusCode: 200,
+            on: function(event, handler) {
+              if (event === 'data') {
+                handler(JSON.stringify({
+                  choices: [{
+                    message: {
+                      content: JSON.stringify({
+                        hasEvent: true,
+                        title: 'Weekly Team Standup - Q4 Planning',
+                        description: 'Weekly standup to discuss Q4 planning and deliverables',
+                        dateTime: '2024-01-02T10:00:00',
+                        location: 'conference room B',
+                        duration: 'PT1H'
+                      })
+                    }
+                  }]
+                }));
+              } else if (event === 'end') {
+                handler();
+              }
+            }
+          };
+
+          const mockRequest = {
+            on: function() {},
+            write: function(body) {
+              // Verify that the prompt includes subject usage instructions
+              const parsedBody = JSON.parse(body);
+              assert.ok(parsedBody.messages[0].content.includes('use the email subject if it'),
+                'Prompt should include instructions to use descriptive subjects');
+              assert.ok(parsedBody.messages[0].content.includes('Subject: Weekly Team Standup - Q4 Planning'),
+                'Email content should include the subject line');
+            },
+            end: function() {
+              setTimeout(() => callback(mockResponse), 0);
+            }
+          };
+
+          return mockRequest;
+        }
+      };
+
+      index.parseEventDetails(data)
+        .then(function(result) {
+          assert.ok(result.eventInfo.hasEvent, 'Should detect event');
+          assert.equal(result.eventInfo.title, 'Weekly Team Standup - Q4 Planning', 'Should use descriptive subject as title');
+          done();
+        })
+        .catch(done);
+    });
   });
 });
