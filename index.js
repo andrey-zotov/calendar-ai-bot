@@ -323,8 +323,8 @@ Calendar AI Bot`;
 </body></html>`;
 
   const params = {
+    FromEmailAddress: data.config.fromEmail,
     Destination: { ToAddresses: [data.senderEmail] },
-    Source: data.config.fromEmail,
     Content: {
       Simple: {
         Subject: {

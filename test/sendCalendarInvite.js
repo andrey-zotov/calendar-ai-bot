@@ -37,7 +37,7 @@ describe('index.js', function() {
 
           var sentEmail = sentEmails[0];
           assert.equal(sentEmail.input.Destination.ToAddresses[0], 'jane@example.com', 'Should send to original sender');
-          assert.equal(sentEmail.input.Source, 'bot@example.com', 'Should send from bot email');
+          assert.equal(sentEmail.input.FromEmailAddress, 'bot@example.com', 'Should send from bot email');
           assert.ok(sentEmail.input.Content.Simple.Subject.Data.includes('Calendar Invite: Team Meeting'), 'Should include subject prefix and title');
           assert.ok(sentEmail.input.Content.Simple.Body.Html.Data.includes('Team Meeting'), 'Should include event title in HTML body');
           assert.ok(sentEmail.input.Content.Simple.Body.Text.Data.includes('BEGIN:VCALENDAR'), 'Should include ICS content in text body');
