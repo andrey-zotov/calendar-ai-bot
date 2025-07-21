@@ -1,0 +1,43 @@
+{
+  "name": "calendar-ai-bot",
+  "version": "1.0.0",
+  "description": "Serverless email calendar invite creation bot using AWS Lambda, SES and OpenAI API",
+  "main": "index.js",
+  "scripts": {
+    "lint": "npx eslint",
+    "test": "mocha -- --check-leaks"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.188.0",
+    "@aws-sdk/client-sesv2": "^3.188.0",
+    "openai": "^4.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.18.0",
+    "@stylistic/eslint-plugin": "^2.12.1",
+    "@stylistic/eslint-plugin-js": "^2.12.1",
+    "globals": "^15.14.0",
+    "mocha": "^11.1.0"
+  },
+  "engines": {
+    "node": ">=18.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fearless-labs/calendar-ai-bot.git"
+  },
+  "keywords": [
+    "calendar",
+    "ai",
+    "bot",
+    "aws",
+    "email",
+    "lambda"
+  ],
+  "author": "Andrey Zotov <azotov@fl-labs.co.uk>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/fearless-labs/calendar-ai-bot/issues"
+  },
+  "homepage": "https://github.com/fearless-labs/calendar-ai-bot#readme"
+}

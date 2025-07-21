@@ -1,0 +1,21 @@
+Return-Path: <sarah@company.com>
+Received: from company.com (company.com [127.0.0.1])
+ by inbound-smtp.us-west-2.amazonaws.com with SMTP id 67890fghij
+ for calendar@example.com;
+ Mon, 15 Jan 2024 10:15:00 +0000 (UTC)
+Message-ID: <casual-email@company.com>
+From: Sarah Johnson <sarah@company.com>
+To: calendar@example.com
+Subject: Just saying hello
+Date: Mon, 15 Jan 2024 10:15:00 +0000
+
+Hey there!
+
+Hope you're having a great day. Just wanted to check in and see how things are going.
+
+The weather has been lovely lately, and I'm looking forward to the weekend.
+
+Let me know if you need anything!
+
+Best,
+Sarah

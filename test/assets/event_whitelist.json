@@ -1,0 +1,69 @@
+{
+  "Records": [
+    {
+      "eventVersion": "1.0",
+      "ses": {
+        "mail": {
+          "commonHeaders": {
+            "from": [
+              "John Smith <john@company.com>"
+            ],
+            "to": [
+              "calendar@example.com"
+            ],
+            "returnPath": "john@company.com",
+            "messageId": "<meeting-invite@company.com>",
+            "date": "Mon, 15 Jan 2024 09:30:00 +0000",
+            "subject": "Team Meeting Tomorrow"
+          },
+          "source": "john@company.com",
+          "timestamp": "2024-01-15T09:30:00.000Z",
+          "destination": [
+            "calendar@example.com"
+          ],
+          "headers": [
+            {
+              "name": "From",
+              "value": "John Smith <john@company.com>"
+            },
+            {
+              "name": "To",
+              "value": "calendar@example.com"
+            },
+            {
+              "name": "Subject",
+              "value": "Team Meeting Tomorrow"
+            }
+          ],
+          "headersTruncated": false,
+          "messageId": "meeting-invite-message-id"
+        },
+        "receipt": {
+          "recipients": [
+            "calendar@example.com"
+          ],
+          "timestamp": "2024-01-15T09:30:00.000Z",
+          "spamVerdict": {
+            "status": "PASS"
+          },
+          "dkimVerdict": {
+            "status": "PASS"
+          },
+          "processingTimeMillis": 500,
+          "action": {
+            "type": "Lambda",
+            "invocationType": "Event",
+            "functionArn": "arn:aws:lambda:us-west-2:123456789012:function:CalendarBot"
+          },
+          "spfVerdict": {
+            "status": "PASS"
+          },
+          "virusVerdict": {
+            "status": "PASS"
+          }
+        }
+      },
+      "eventSource": "aws:ses"
+    }
+  ]
+}

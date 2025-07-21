@@ -1,0 +1,20 @@
+Return-Path: <john@company.com>
+Received: from company.com (company.com [127.0.0.1])
+ by inbound-smtp.us-west-2.amazonaws.com with SMTP id 12345abcde
+ for calendar@example.com;
+ Mon, 15 Jan 2024 09:30:00 +0000 (UTC)
+Message-ID: <meeting-invite@company.com>
+From: John Smith <john@company.com>
+To: calendar@example.com
+Subject: Team Meeting Tomorrow
+Date: Mon, 15 Jan 2024 09:30:00 +0000
+
+Hi team,
+
+Let's have our weekly standup meeting tomorrow at 2 PM in the main conference room.
+We'll be discussing the Q1 roadmap and reviewing last week's progress.
+
+The meeting should take about an hour. Please come prepared with your updates.
+
+Thanks,
+John
