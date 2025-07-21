@@ -22,7 +22,7 @@ const getConfig = () => ({
   openaiApiKey: process.env.OPENAI_API_KEY,
   openaiModel: process.env.OPENAI_MODEL || 'gpt-3.5-turbo',
   fromEmail: process.env.FROM_EMAIL || "noreply@example.com",
-  subjectPrefix: process.env.SUBJECT_PREFIX || "Calendar Invite: ",
+  subjectPrefix: process.env.SUBJECT_PREFIX || "",
   emailBucket: process.env.EMAIL_BUCKET,
   emailKeyPrefix: process.env.EMAIL_KEY_PREFIX || "emails/",
   allowPlusSign: process.env.ALLOW_PLUS_SIGN !== 'false',
@@ -257,34 +257,87 @@ exports.sendCalendarInvite = function(data) {
   // Generate calendar invite content
   const ics = generateICS(data.eventInfo, data.senderEmail);
 
+  // Validate required data
+  data.log({
+    level: "info",
+    message: "Validating email parameters",
+    senderEmail: data.senderEmail,
+    fromEmail: data.config.fromEmail,
+    eventTitle: data.eventInfo.title,
+    hasValidSenderEmail: !!data.senderEmail && data.senderEmail.includes('@'),
+    hasValidFromEmail: !!data.config.fromEmail && data.config.fromEmail.includes('@')
+  });
+
+  if (!data.senderEmail || !data.senderEmail.includes('@')) {
+    data.log({
+      level: "error",
+      message: "Invalid sender email address",
+      senderEmail: data.senderEmail
+    });
+    return Promise.reject(new Error('Error: Invalid sender email address.'));
+  }
+
+  if (!data.config.fromEmail || !data.config.fromEmail.includes('@')) {
+    data.log({
+      level: "error", 
+      message: "Invalid from email address",
+      fromEmail: data.config.fromEmail
+    });
+    return Promise.reject(new Error('Error: Invalid from email address.'));
+  }
+
+  // Clean and validate event data
+  const cleanTitle = (data.eventInfo.title || 'Event').replace(/[\r\n\t]/g, ' ').substring(0, 200);
+  const cleanDateTime = data.eventInfo.dateTime || 'Not specified';
+  const cleanLocation = (data.eventInfo.location || 'Not specified').replace(/[\r\n\t]/g, ' ').substring(0, 200);
+  const cleanDescription = (data.eventInfo.description || 'No description').replace(/[\r\n\t]/g, ' ').substring(0, 500);
+  
+  const textBody = `Hello,
+
+I've detected event information in your email and created a calendar invite for you:
+
+Event: ${cleanTitle}
+Date/Time: ${cleanDateTime}
+Location: ${cleanLocation}
+Description: ${cleanDescription}
+
+Calendar Invite (copy and save as .ics file):
+
+${ics}
+
+Best regards,
+Calendar AI Bot`;
+
+  const htmlBody = `<html><body>
+<p>Hello,</p>
+<p>I've detected event information in your email and created a calendar invite for you:</p>
+<ul>
+  <li><strong>Event:</strong> ${cleanTitle.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</li>
+  <li><strong>Date/Time:</strong> ${cleanDateTime}</li>
+  <li><strong>Location:</strong> ${cleanLocation.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</li>
+  <li><strong>Description:</strong> ${cleanDescription.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</li>
+</ul>
+<p>Please see the calendar invite content below:</p>
+<pre>${ics.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>
+<p>Best regards,<br>Calendar AI Bot</p>
+</body></html>`;
+
   const params = {
     Destination: { ToAddresses: [data.senderEmail] },
     Source: data.config.fromEmail,
     Content: {
       Simple: {
         Subject: {
-          Data: data.config.subjectPrefix + data.eventInfo.title,
+          Data: (data.config.subjectPrefix || "") + cleanTitle,
           Charset: 'UTF-8'
         },
         Body: {
           Text: {
-            Data: `Hello,\n\nI've detected event information in your email and created a calendar invite for you:\n\nEvent: ${data.eventInfo.title}\nDate/Time: ${data.eventInfo.dateTime}\nLocation: ${data.eventInfo.location || 'Not specified'}\nDescription: ${data.eventInfo.description || 'No description'}\n\nCalendar Invite (copy and save as .ics file):\n\n${ics}\n\nBest regards,\nCalendar AI Bot`,
+            Data: textBody,
             Charset: 'UTF-8'
           },
           Html: {
-            Data: `<html><body>
-              <p>Hello,</p>
-              <p>I've detected event information in your email and created a calendar invite for you:</p>
-              <ul>
-                <li><strong>Event:</strong> ${data.eventInfo.title}</li>
-                <li><strong>Date/Time:</strong> ${data.eventInfo.dateTime}</li>
-                <li><strong>Location:</strong> ${data.eventInfo.location || 'Not specified'}</li>
-                <li><strong>Description:</strong> ${data.eventInfo.description || 'No description'}</li>
-              </ul>
-              <p>Please see the calendar invite content below:</p>
-              <pre>${ics}</pre>
-              <p>Best regards,<br>Calendar AI Bot</p>
-            </body></html>`,
+            Data: htmlBody,
             Charset: 'UTF-8'
           }
         }
@@ -295,7 +348,8 @@ exports.sendCalendarInvite = function(data) {
 
   data.log({
     level: "info",
-    message: `Sending calendar invite to ${data.senderEmail} for event: ${data.eventInfo.title}`
+    message: `Sending calendar invite to ${data.senderEmail} for event: ${data.eventInfo.title}`,
+    sesParams: JSON.stringify(params, null, 2)
   });
 
   return new Promise(function(resolve, reject) {
