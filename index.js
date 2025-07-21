@@ -550,11 +550,10 @@ function formatICSDate(date, timezone) {
     return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
   }
 
-  // For local timezone, format without Z suffix so calendar apps interpret in user's local timezone
-  // The timezone offset adjustment helps ensure the time displays correctly
-  const offset = getTimezoneOffset(timezone, date);
-  const localDate = new Date(date.getTime() + offset * 60000);
-  return localDate.toISOString().replace(/[-:]/g, '').split('.')[0];
+  // For local timezone, keep the original time as-is (don't apply offset)
+  // The date parameter already represents the local time the user wants
+  // Format without Z suffix so calendar apps interpret it as local time
+  return date.toISOString().replace(/[-:]/g, '').split('.')[0];
 }
 
 /**

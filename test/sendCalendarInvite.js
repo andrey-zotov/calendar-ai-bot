@@ -229,9 +229,10 @@ describe('index.js', function() {
             var base64Content = icsMatch[1].replace(/\r\n/g, '');
             var icsContent = Buffer.from(base64Content, 'base64').toString('utf8');
             
-            // Check that timezone-aware times are generated (BST adjustment applied)
-            // Summer time meeting at 11:00 should be formatted as local time without Z suffix
-            assert.ok(icsContent.includes('DTSTART:20240715T120000'), 'Should adjust time for BST (11am + 1 hour = 12pm UTC time formatted as local)');
+            // Check that local times are preserved (no timezone offset adjustment)
+            // Summer time meeting at 11:00 should stay as 11:00 local time without Z suffix
+            assert.ok(icsContent.includes('DTSTART:20240715T110000'), 'Should preserve local time (11am stays as 11am)');
+            assert.ok(icsContent.includes('DTEND:20240715T120000'), 'Should preserve local end time (11am + 1 hour = 12pm)');
             assert.ok(icsContent.includes('BEGIN:VEVENT'), 'Should include event block');
             assert.ok(icsContent.includes('SUMMARY:UK Meeting'), 'Should include event title');
             // Should NOT include VTIMEZONE blocks as they are not needed
