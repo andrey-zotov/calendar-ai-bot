@@ -30,48 +30,7 @@ Email → AWS SES → Lambda Function → OpenAI API → Calendar Invite → Ema
 - OpenAI API key
 - Domain with email capabilities (for receiving emails)
 
-## Installation & Setup
-
-### 1. Clone the Repository
-
-```bash
-git clone git@github.com:andrey-zotov/calendar-ai-bot.git
-cd calendar-ai-bot
-```
-
-### 2. Install Dependencies
-
-```bash
-npm install
-```
-
-### 3. Configure Environment Variables
-
-Create a `.env` file with the following variables:
-
-```env
-# OpenAI Configuration
-OPENAI_API_KEY=your_openai_api_key_here
-OPENAI_MODEL=gpt-3.5-turbo
-MAX_TOKENS=500
-
-# Email Configuration
-FROM_EMAIL=your-bot@yourdomain.com
-SUBJECT_PREFIX=
-ALLOW_PLUS_SIGN=true
-
-# Timezone Configuration
-DEFAULT_TIMEZONE=Europe/London
-
-# Whitelist Configuration
-WHITELISTED_EMAILS=email1@domain.com,email2@domain.com
-
-# AWS Configuration
-EMAIL_BUCKET=
-EMAIL_KEY_PREFIX=
-```
-
-### 4. AWS Setup
+### AWS Setup
 
 #### SES Configuration
 1. Verify your domain in AWS SES
@@ -205,7 +164,6 @@ The bot can parse event information from various email formats. It looks for:
 - Date and time information
 - Location details
 - Event descriptions
-- Attendee information
 
 ### Example Email
 
@@ -243,7 +201,6 @@ The bot uses OpenAI's API to intelligently parse email content and extract:
 - Event date and time
 - Location
 - Event description
-- Attendees
 
 ## Development
 
@@ -257,16 +214,8 @@ npm install
 npm run lint
 
 # Test
-npm run test
+npm test
 ```
-
-## Security Considerations
-
-- **API Key Security**: Store OpenAI API key in AWS Secrets Manager
-- **Email Validation**: Always validate email addresses
-- **Rate Limiting**: Implement rate limiting for OpenAI API calls
-- **Error Handling**: Proper error handling to prevent information leakage
-- **Logging**: Secure logging practices
 
 ## Troubleshooting
 
@@ -305,7 +254,7 @@ DEBUG=true
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE-MIT](LICENSE-MIT) file for details.
 
 ## Acknowledgments
 
@@ -316,6 +265,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Support
 
 For support and questions:
-- Create an issue in the GitHub repository
 - Check the troubleshooting section
 - Review AWS and OpenAI documentation
+- Create an issue in the GitHub repository
