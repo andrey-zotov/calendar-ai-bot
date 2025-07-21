@@ -60,6 +60,9 @@ FROM_EMAIL=your-bot@yourdomain.com
 SUBJECT_PREFIX=
 ALLOW_PLUS_SIGN=true
 
+# Timezone Configuration
+DEFAULT_TIMEZONE=Europe/London
+
 # Whitelist Configuration
 WHITELISTED_EMAILS=email1@domain.com,email2@domain.com
 
@@ -103,6 +106,7 @@ Ensure your Lambda execution role has the following permissions:
 | `WHITELISTED_EMAILS` | Comma-separated list of allowed sender emails | Yes |
 | `ALLOW_PLUS_SIGN` | Enables support for plus sign suffixes on email addresses. | No |
 | `SUBJECT_PREFIX` | Invite emails subject will contain this prefix | No |
+| `DEFAULT_TIMEZONE` | Timezone for event times (default: Europe/London) | No |
 | `EMAIL_BUCKET` | AWS region for SES operations | Yes |
 | `EMAIL_KEY_PREFIX` | S3 key name prefix where SES stores email. Include the trailing slash. | No |
 

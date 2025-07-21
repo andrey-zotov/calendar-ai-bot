@@ -15,6 +15,7 @@ console.log("Calendar AI Bot // Version 1.0.0");
 // - SUBJECT_PREFIX: Calendar invite emails subject prefix
 // - WHITELISTED_EMAILS: Comma-separated list of allowed sender emails
 // - ALLOW_PLUS_SIGN: Enables support for plus sign suffixes
+// - DEFAULT_TIMEZONE: Timezone for event times (default: Europe/London)
 // - EMAIL_BUCKET: S3 bucket name where SES stores emails
 // - EMAIL_KEY_PREFIX: S3 key name prefix where SES stores email
 
@@ -26,6 +27,7 @@ const getConfig = () => ({
   emailBucket: process.env.EMAIL_BUCKET,
   emailKeyPrefix: process.env.EMAIL_KEY_PREFIX || "emails/",
   allowPlusSign: process.env.ALLOW_PLUS_SIGN !== 'false',
+  defaultTimezone: process.env.DEFAULT_TIMEZONE || 'Europe/London',
   whitelistedEmails: process.env.WHITELISTED_EMAILS ?
       process.env.WHITELISTED_EMAILS.split(',').map(email => email.trim().toLowerCase()) : []
 });
@@ -67,7 +69,7 @@ exports.parseEvent = function(data) {
 function isInvitationResponse(data) {
   const subject = data.email.commonHeaders.subject || '';
   const subjectLower = subject.toLowerCase();
-  
+
   // Check for common invitation response patterns in subject
   const responsePatterns = [
     'accepted:',
@@ -85,18 +87,18 @@ function isInvitationResponse(data) {
     'meeting response',
     'calendar response'
   ];
-  
+
   for (const pattern of responsePatterns) {
     if (subjectLower.includes(pattern)) {
       return true;
     }
   }
-  
+
   // Check sender patterns - common calendar systems
   const senderEmail = data.email.commonHeaders.from[0];
   const extractedEmail = senderEmail.match(/<(.+)>/) ? senderEmail.match(/<(.+)>/)[1] : senderEmail;
   const senderLower = extractedEmail.toLowerCase();
-  
+
   const calendarSenders = [
     'calendar-server@',
     'noreply@calendar',
@@ -108,13 +110,13 @@ function isInvitationResponse(data) {
     'exchange.',
     'calendar-daemon@'
   ];
-  
+
   for (const sender of calendarSenders) {
     if (senderLower.includes(sender)) {
       return true;
     }
   }
-  
+
   return false;
 }
 
@@ -182,7 +184,7 @@ exports.fetchMessage = function(data) {
   if (data.earlyTermination) {
     return Promise.resolve(data);
   }
-  
+
   data.log({
     level: "info",
     message: "Fetching email at s3://" + data.config.emailBucket + '/' +
@@ -222,7 +224,7 @@ exports.parseEventDetails = async function(data) {
   if (data.earlyTermination) {
     return Promise.resolve(data);
   }
-  
+
   try {
     // Extract email body content
     const match = data.emailData.match(/^((?:.+\r?\n)*)(\r?\n(?:.*\s+)*)/m);
@@ -254,7 +256,9 @@ If this email contains information about a meeting, event, or appointment, retur
 Important guidelines:
 - For the event title, use the email subject if it's descriptive and appropriate for a calendar event. If the subject is generic (like "Re: Meeting" or "FW: Question"), create a more descriptive title based on the email content.
 - Today is ${new Date().toISOString().split('T')[0]}.
+- The current timezone is ${data.config.defaultTimezone}. When parsing times, assume they are in this timezone unless otherwise specified.
 - With regards to the meeting date, if the email is not specific enough (e.g. year is not specified, or only weekday is given), pick the date in the future, which is closest to today.
+- Return times in ISO 8601 format (YYYY-MM-DDTHH:mm:ss) without timezone designator, as they will be interpreted in the ${data.config.defaultTimezone} timezone.
 
 If no event information is found, return: {"hasEvent": false}
 
@@ -339,7 +343,7 @@ exports.sendCalendarInvite = function(data) {
   if (data.earlyTermination) {
     return Promise.resolve(data);
   }
-  
+
   if (!data.eventInfo.hasEvent) {
     data.log({
       level: "info",
@@ -349,7 +353,7 @@ exports.sendCalendarInvite = function(data) {
   }
 
   // Generate calendar invite content
-  const ics = generateICS(data.eventInfo, data.senderEmail, data.config.fromEmail);
+  const ics = generateICS(data.eventInfo, data.senderEmail, data.config.fromEmail, data.config.defaultTimezone);
 
   // Validate required data
   data.log({
@@ -495,18 +499,80 @@ Calendar AI Bot`;
 };
 
 /**
+ * Converts a timezone string to an offset from UTC.
+ *
+ * @param {string} timezone - Timezone identifier (e.g., 'Europe/London')
+ * @param {Date} date - Date to get offset for (needed for DST)
+ *
+ * @return {number} - Offset in minutes from UTC (positive for ahead, negative for behind)
+ */
+function getTimezoneOffset(timezone, date) {
+  // Simple mapping for common timezones (in a production app, use a proper timezone library)
+  const timezoneOffsets = {
+    'Europe/London': () => {
+      // British Summer Time (BST) is UTC+1 (Mar-Oct), GMT is UTC+0 (Nov-Feb)
+      const year = date.getFullYear();
+      const month = date.getMonth(); // 0-indexed
+      const day = date.getDate();
+      const hour = date.getHours();
+
+      // Approximate BST dates (last Sunday in March to last Sunday in October)
+      // This is a simplified check - in production use a proper timezone library
+      if (month > 2 && month < 9) return 60; // BST (UTC+1)
+      if (month === 2) { // March
+        const lastSunday = 31 - new Date(year, 2, 31).getDay();
+        return day >= lastSunday ? 60 : 0;
+      }
+      if (month === 9) { // October
+        const lastSunday = 31 - new Date(year, 9, 31).getDay();
+        return day < lastSunday ? 60 : 0;
+      }
+      return 0; // GMT (UTC+0)
+    },
+    'UTC': () => 0,
+    'GMT': () => 0
+  };
+
+  const offsetFunc = timezoneOffsets[timezone] || timezoneOffsets['Europe/London'];
+  return offsetFunc();
+}
+
+/**
+ * Formats a date for ICS with timezone support.
+ *
+ * @param {Date} date - Date to format
+ * @param {string} timezone - Timezone identifier
+ *
+ * @return {string} - Formatted date string for ICS
+ */
+function formatICSDate(date, timezone) {
+  if (timezone === 'UTC' || timezone === 'GMT') {
+    return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+  }
+
+  // For local timezone, format without Z suffix so calendar apps interpret in user's local timezone
+  // The timezone offset adjustment helps ensure the time displays correctly
+  const offset = getTimezoneOffset(timezone, date);
+  const localDate = new Date(date.getTime() + offset * 60000);
+  return localDate.toISOString().replace(/[-:]/g, '').split('.')[0];
+}
+
+/**
  * Generates ICS (iCalendar) content for the event.
  *
  * @param {object} eventInfo - Event information from OpenAI.
  * @param {string} attendeeEmail - Email of the attendee.
  * @param {string} organizerEmail - Email of the organizer (bot).
+ * @param {string} timezone - Timezone for the event (e.g., 'Europe/London').
  *
  * @return {string} - ICS content.
  */
-function generateICS(eventInfo, attendeeEmail, organizerEmail) {
-  const now = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+function generateICS(eventInfo, attendeeEmail, organizerEmail, timezone = 'Europe/London') {
+  const now = new Date();
+  const nowFormatted = formatICSDate(now, 'UTC'); // DTSTAMP should always be in UTC
+
   const startDate = new Date(eventInfo.dateTime);
-  const startDateFormatted = startDate.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+  const startDateFormatted = formatICSDate(startDate, timezone);
 
   // Calculate end time (default to 1 hour if no duration specified)
   let duration = eventInfo.duration || 'PT1H';  // ISO 8601 duration format
@@ -522,11 +588,12 @@ function generateICS(eventInfo, attendeeEmail, organizerEmail) {
   }
 
   const endDate = new Date(startDate.getTime() + durationMs);
-  const endDateFormatted = endDate.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+  const endDateFormatted = formatICSDate(endDate, timezone);
 
   const uid = `${eventInfo.title?.replace(/\s+/g, '-') || 'event'}-${Date.now()}@calendar-ai-bot`;
 
   // Follow the exact format from StackOverflow solution - order is critical!
+  // Use local time format (without Z suffix) so calendar apps interpret in user's timezone
   const iCal = `BEGIN:VCALENDAR
 PRODID:-//Calendar AI Bot//_Scheduler//EN
 VERSION:2.0
@@ -535,13 +602,13 @@ METHOD:REQUEST
 BEGIN:VEVENT
 DTSTART:${startDateFormatted}
 DTEND:${endDateFormatted}
-DTSTAMP:${now}
+DTSTAMP:${nowFormatted}
 ORGANIZER;CN=${organizerEmail}:mailto:${organizerEmail}
 UID:${uid}
 ATTENDEE;CUTYPE=INDIVIDUAL;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE;CN=${attendeeEmail};X-NUM-GUESTS=0:mailto:${attendeeEmail}
-CREATED:${now}
+CREATED:${nowFormatted}
 DESCRIPTION:${eventInfo.description || ''}
-LAST-MODIFIED:${now}
+LAST-MODIFIED:${nowFormatted}
 LOCATION:${eventInfo.location || ''}
 SEQUENCE:0
 STATUS:CONFIRMED

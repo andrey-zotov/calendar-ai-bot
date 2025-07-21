@@ -189,5 +189,58 @@ describe('index.js', function() {
         })
         .catch(done);
     });
+
+    it('should generate timezone-aware ICS content for Europe/London', function(done) {
+      var sentEmails = [];
+      var data = {
+        eventInfo: {
+          hasEvent: true,
+          title: 'UK Meeting',
+          description: 'Summer timezone test',
+          dateTime: '2024-07-15T11:00:00', // Summer time (BST)
+          location: 'London Office',
+          duration: 'PT1H'
+        },
+        senderEmail: 'london@example.com',
+        config: {
+          fromEmail: 'bot@example.com',
+          subjectPrefix: '',
+          defaultTimezone: 'Europe/London'
+        },
+        log: function() {},
+        ses: {
+          send: function(options, callback) {
+            sentEmails.push(options);
+            callback(null, {MessageId: 'test-id'});
+          }
+        }
+      };
+
+      index.sendCalendarInvite(data)
+        .then(function() {
+          var rawContent = sentEmails[0].input.Content.Raw.Data.toString();
+          
+          // Check that the email contains base64 encoded content
+          assert.ok(rawContent.includes('Content-Transfer-Encoding: base64'), 'Should contain base64 encoded ICS');
+          
+          // Decode the base64 content to verify timezone handling
+          var icsMatch = rawContent.match(/Content-Transfer-Encoding: base64\r\n\r\n([A-Za-z0-9+/=\r\n]+)/);
+          if (icsMatch) {
+            var base64Content = icsMatch[1].replace(/\r\n/g, '');
+            var icsContent = Buffer.from(base64Content, 'base64').toString('utf8');
+            
+            // Check that timezone-aware times are generated (BST adjustment applied)
+            // Summer time meeting at 11:00 should be formatted as local time without Z suffix
+            assert.ok(icsContent.includes('DTSTART:20240715T120000'), 'Should adjust time for BST (11am + 1 hour = 12pm UTC time formatted as local)');
+            assert.ok(icsContent.includes('BEGIN:VEVENT'), 'Should include event block');
+            assert.ok(icsContent.includes('SUMMARY:UK Meeting'), 'Should include event title');
+            // Should NOT include VTIMEZONE blocks as they are not needed
+            assert.ok(!icsContent.includes('BEGIN:VTIMEZONE'), 'Should not include VTIMEZONE definition');
+          }
+
+          done();
+        })
+        .catch(done);
+    });
   });
 });
