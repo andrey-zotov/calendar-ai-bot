@@ -139,6 +139,7 @@ describe('index.js', function() {
     });
 
     it('should ignore calendar invitation acceptance emails', function(done) {
+      var callbackCalled = false;
       var data = {
         email: {
           commonHeaders: {
@@ -151,15 +152,21 @@ describe('index.js', function() {
         },
         log: function() {},
         callback: function() {
-          done(); // Should call callback to exit early for invitation responses
+          callbackCalled = true;
         },
         recipients: ['info@example.com']
       };
-      // This should call the callback and not return a promise
-      index.checkWhitelist(data);
+      index.checkWhitelist(data)
+        .then(function(result) {
+          assert.equal(callbackCalled, true, 'Should call callback for invitation responses');
+          assert.equal(result.earlyTermination, true, 'Should set earlyTermination flag');
+          done();
+        })
+        .catch(done);
     });
 
     it('should ignore calendar invitation decline emails', function(done) {
+      var callbackCalled = false;
       var data = {
         email: {
           commonHeaders: {
@@ -172,15 +179,21 @@ describe('index.js', function() {
         },
         log: function() {},
         callback: function() {
-          done(); // Should call callback to exit early for invitation responses
+          callbackCalled = true;
         },
         recipients: ['info@example.com']
       };
-      // This should call the callback and not return a promise
-      index.checkWhitelist(data);
+      index.checkWhitelist(data)
+        .then(function(result) {
+          assert.equal(callbackCalled, true, 'Should call callback for invitation responses');
+          assert.equal(result.earlyTermination, true, 'Should set earlyTermination flag');
+          done();
+        })
+        .catch(done);
     });
 
     it('should ignore emails from calendar systems', function(done) {
+      var callbackCalled = false;
       var data = {
         email: {
           commonHeaders: {
@@ -193,15 +206,21 @@ describe('index.js', function() {
         },
         log: function() {},
         callback: function() {
-          done(); // Should call callback to exit early for calendar system emails
+          callbackCalled = true;
         },
         recipients: ['info@example.com']
       };
-      // This should call the callback and not return a promise
-      index.checkWhitelist(data);
+      index.checkWhitelist(data)
+        .then(function(result) {
+          assert.equal(callbackCalled, true, 'Should call callback for calendar system emails');
+          assert.equal(result.earlyTermination, true, 'Should set earlyTermination flag');
+          done();
+        })
+        .catch(done);
     });
 
     it('should ignore Google Calendar notification emails', function(done) {
+      var callbackCalled = false;
       var data = {
         email: {
           commonHeaders: {
@@ -214,12 +233,17 @@ describe('index.js', function() {
         },
         log: function() {},
         callback: function() {
-          done(); // Should call callback to exit early for Google Calendar emails
+          callbackCalled = true;
         },
         recipients: ['info@example.com']
       };
-      // This should call the callback and not return a promise
-      index.checkWhitelist(data);
+      index.checkWhitelist(data)
+        .then(function(result) {
+          assert.equal(callbackCalled, true, 'Should call callback for Google Calendar emails');
+          assert.equal(result.earlyTermination, true, 'Should set earlyTermination flag');
+          done();
+        })
+        .catch(done);
     });
 
     it('should process legitimate event emails with normal subjects', function(done) {
@@ -246,6 +270,7 @@ describe('index.js', function() {
     });
 
     it('should ignore tentative response emails', function(done) {
+      var callbackCalled = false;
       var data = {
         email: {
           commonHeaders: {
@@ -258,12 +283,17 @@ describe('index.js', function() {
         },
         log: function() {},
         callback: function() {
-          done(); // Should call callback to exit early for tentative responses
+          callbackCalled = true;
         },
         recipients: ['info@example.com']
       };
-      // This should call the callback and not return a promise
-      index.checkWhitelist(data);
+      index.checkWhitelist(data)
+        .then(function(result) {
+          assert.equal(callbackCalled, true, 'Should call callback for tentative responses');
+          assert.equal(result.earlyTermination, true, 'Should set earlyTermination flag');
+          done();
+        })
+        .catch(done);
     });
   });
 });

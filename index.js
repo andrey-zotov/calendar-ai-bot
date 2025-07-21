@@ -140,7 +140,10 @@ exports.checkWhitelist = function(data) {
       level: "info",
       subject: data.email.commonHeaders.subject
     });
-    return data.callback();
+    // Set a flag to indicate early termination and call callback
+    data.earlyTermination = true;
+    data.callback();
+    return Promise.resolve(data);
   }
 
   if (data.config.whitelistedEmails.length === 0) {
@@ -175,6 +178,11 @@ exports.checkWhitelist = function(data) {
  * @return {object} - Promise resolved with data.
  */
 exports.fetchMessage = function(data) {
+  // Skip processing if early termination was requested
+  if (data.earlyTermination) {
+    return Promise.resolve(data);
+  }
+  
   data.log({
     level: "info",
     message: "Fetching email at s3://" + data.config.emailBucket + '/' +
@@ -210,6 +218,11 @@ exports.fetchMessage = function(data) {
  * @return {object} - Promise resolved with data.
  */
 exports.parseEventDetails = async function(data) {
+  // Skip processing if early termination was requested
+  if (data.earlyTermination) {
+    return Promise.resolve(data);
+  }
+  
   try {
     // Extract email body content
     const match = data.emailData.match(/^((?:.+\r?\n)*)(\r?\n(?:.*\s+)*)/m);
@@ -320,6 +333,11 @@ ${emailContent}`;
  * @return {object} - Promise resolved with data.
  */
 exports.sendCalendarInvite = function(data) {
+  // Skip processing if early termination was requested
+  if (data.earlyTermination) {
+    return Promise.resolve(data);
+  }
+  
   if (!data.eventInfo.hasEvent) {
     data.log({
       level: "info",
