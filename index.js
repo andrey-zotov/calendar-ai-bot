@@ -156,8 +156,8 @@ exports.parseEventDetails = async function(data) {
       message: "Parsing email content with OpenAI"
     });
 
-    const prompt = `Parse the following email content and extract event information. If this email contains information about a meeting, event, or appointment, return a JSON object with the following structure:
-
+    const prompt = `Parse the following email content and extract event information.
+If this email contains information about a meeting, event, or appointment, return a JSON object with the following structure:
 {
   "hasEvent": true,
   "title": "Event title",
@@ -166,6 +166,9 @@ exports.parseEventDetails = async function(data) {
   "location": "Event location",
   "duration": "PT1H" // ISO 8601 duration format
 }
+
+Note that today is ${new Date().toISOString().split('T')[0]}.
+With regards to the meeting date, if the email is not specific enough (e.g. year is not specified, or only weekday is given), pick the date in the future, which is closest to today.
 
 If no event information is found, return: {"hasEvent": false}
 
@@ -255,7 +258,7 @@ exports.sendCalendarInvite = function(data) {
   }
 
   // Generate calendar invite content
-  const ics = generateICS(data.eventInfo, data.senderEmail);
+  const ics = generateICS(data.eventInfo, data.senderEmail, data.config.fromEmail);
 
   // Validate required data
   data.log({
@@ -279,7 +282,7 @@ exports.sendCalendarInvite = function(data) {
 
   if (!data.config.fromEmail || !data.config.fromEmail.includes('@')) {
     data.log({
-      level: "error", 
+      level: "error",
       message: "Invalid from email address",
       fromEmail: data.config.fromEmail
     });
@@ -291,7 +294,7 @@ exports.sendCalendarInvite = function(data) {
   const cleanDateTime = data.eventInfo.dateTime || 'Not specified';
   const cleanLocation = (data.eventInfo.location || 'Not specified').replace(/[\r\n\t]/g, ' ').substring(0, 200);
   const cleanDescription = (data.eventInfo.description || 'No description').replace(/[\r\n\t]/g, ' ').substring(0, 500);
-  
+
   const textBody = `Hello,
 
 I've detected event information in your email and created a calendar invite for you:
@@ -301,9 +304,7 @@ Date/Time: ${cleanDateTime}
 Location: ${cleanLocation}
 Description: ${cleanDescription}
 
-Calendar Invite (copy and save as .ics file):
-
-${ics}
+Please find the calendar invite attached to this email.
 
 Best regards,
 Calendar AI Bot`;
@@ -317,30 +318,59 @@ Calendar AI Bot`;
   <li><strong>Location:</strong> ${cleanLocation.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</li>
   <li><strong>Description:</strong> ${cleanDescription.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</li>
 </ul>
-<p>Please see the calendar invite content below:</p>
-<pre>${ics.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>
+<p>Please find the calendar invite attached to this email.</p>
 <p>Best regards,<br>Calendar AI Bot</p>
 </body></html>`;
+
+  // Convert ICS to base64 for attachment (following StackOverflow solution)
+  const buf = Buffer.from(ics, 'utf-8');
+  const base64Cal = buf.toString('base64');
+
+  // Create raw MIME email with base64 ICS attachment
+  const boundary = `----=_Part_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const subject = (data.config.subjectPrefix || "") + cleanTitle;
+
+  const rawEmail = [
+    `From: ${data.config.fromEmail}`,
+    `To: ${data.senderEmail}`,
+    `Reply-To: ${data.config.fromEmail}`,
+    `Subject: ${subject}`,
+    `MIME-Version: 1.0`,
+    `Content-Type: multipart/mixed; boundary="${boundary}"`,
+    ``,
+    `--${boundary}`,
+    `Content-Type: multipart/alternative; boundary="${boundary}-alt"`,
+    ``,
+    `--${boundary}-alt`,
+    `Content-Type: text/plain; charset=UTF-8`,
+    `Content-Transfer-Encoding: quoted-printable`,
+    ``,
+    textBody,
+    ``,
+    `--${boundary}-alt`,
+    `Content-Type: text/html; charset=UTF-8`,
+    `Content-Transfer-Encoding: quoted-printable`,
+    ``,
+    htmlBody,
+    ``,
+    `--${boundary}-alt--`,
+    ``,
+    `--${boundary}`,
+    `Content-Type: text/calendar;method=REQUEST;name="invite.ics"`,
+    `Content-Transfer-Encoding: base64`,
+    `Content-Disposition: attachment; filename="invite.ics"`,
+    ``,
+    base64Cal,
+    ``,
+    `--${boundary}--`
+  ].join('\r\n');
 
   const params = {
     FromEmailAddress: data.config.fromEmail,
     Destination: { ToAddresses: [data.senderEmail] },
     Content: {
-      Simple: {
-        Subject: {
-          Data: (data.config.subjectPrefix || "") + cleanTitle,
-          Charset: 'UTF-8'
-        },
-        Body: {
-          Text: {
-            Data: textBody,
-            Charset: 'UTF-8'
-          },
-          Html: {
-            Data: htmlBody,
-            Charset: 'UTF-8'
-          }
-        }
+      Raw: {
+        Data: Buffer.from(rawEmail, 'utf8')
       }
     },
     ReplyToAddresses: [data.config.fromEmail]
@@ -378,32 +408,58 @@ Calendar AI Bot`;
  *
  * @param {object} eventInfo - Event information from OpenAI.
  * @param {string} attendeeEmail - Email of the attendee.
+ * @param {string} organizerEmail - Email of the organizer (bot).
  *
  * @return {string} - ICS content.
  */
-function generateICS(eventInfo, attendeeEmail) {
+function generateICS(eventInfo, attendeeEmail, organizerEmail) {
   const now = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-  const eventDate = new Date(eventInfo.dateTime).toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-  const uid = `${now}-${Math.random().toString(36).substr(2, 9)}@calendar-ai-bot`;
+  const startDate = new Date(eventInfo.dateTime);
+  const startDateFormatted = startDate.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
 
-  return `BEGIN:VCALENDAR
+  // Calculate end time (default to 1 hour if no duration specified)
+  let duration = eventInfo.duration || 'PT1H';  // ISO 8601 duration format
+  let durationMs = 60 * 60 * 1000; // Default 1 hour in milliseconds
+
+  // Parse ISO 8601 duration (PT1H = 1 hour, PT30M = 30 minutes, etc.)
+  if (duration.match(/PT(\d+)H/)) {
+    const hours = parseInt(duration.match(/PT(\d+)H/)[1]);
+    durationMs = hours * 60 * 60 * 1000;
+  } else if (duration.match(/PT(\d+)M/)) {
+    const minutes = parseInt(duration.match(/PT(\d+)M/)[1]);
+    durationMs = minutes * 60 * 1000;
+  }
+
+  const endDate = new Date(startDate.getTime() + durationMs);
+  const endDateFormatted = endDate.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+
+  const uid = `${eventInfo.title?.replace(/\s+/g, '-') || 'event'}-${Date.now()}@calendar-ai-bot`;
+
+  // Follow the exact format from StackOverflow solution - order is critical!
+  const iCal = `BEGIN:VCALENDAR
+PRODID:-//Calendar AI Bot//_Scheduler//EN
 VERSION:2.0
-PRODID:-//Calendar AI Bot//Calendar AI Bot 1.0//EN
 CALSCALE:GREGORIAN
 METHOD:REQUEST
 BEGIN:VEVENT
+DTSTART:${startDateFormatted}
+DTEND:${endDateFormatted}
 DTSTAMP:${now}
+ORGANIZER;CN=${organizerEmail}:mailto:${organizerEmail}
 UID:${uid}
-DTSTART:${eventDate}
-SUMMARY:${eventInfo.title}
+ATTENDEE;CUTYPE=INDIVIDUAL;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE;CN=${attendeeEmail};X-NUM-GUESTS=0:mailto:${attendeeEmail}
+CREATED:${now}
 DESCRIPTION:${eventInfo.description || ''}
+LAST-MODIFIED:${now}
 LOCATION:${eventInfo.location || ''}
-ATTENDEE:mailto:${attendeeEmail}
-ORGANIZER:mailto:${attendeeEmail}
+SEQUENCE:0
 STATUS:CONFIRMED
+SUMMARY:${eventInfo.title || 'Event'}
 TRANSP:OPAQUE
 END:VEVENT
 END:VCALENDAR`;
+
+  return iCal;
 }
 
 /**
