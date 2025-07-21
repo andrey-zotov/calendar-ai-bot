@@ -125,10 +125,10 @@ describe('index.js', function() {
       index.sendCalendarInvite(data)
         .then(function() {
           var rawContent = sentEmails[0].input.Content.Raw.Data.toString();
-          
+
           // Check that the email contains base64 encoded content
           assert.ok(rawContent.includes('Content-Transfer-Encoding: base64'), 'Should contain base64 encoded ICS');
-          
+
           // For testing purposes, just validate the test data we're sending
           // In real usage, Gmail will decode the base64 content properly
           var icsContent = 'SUMMARY:Test Event with Special Characters & Symbols\nLOCATION:Room 123, Building A\nATTENDEE\nORGANIZER';
@@ -137,7 +137,7 @@ describe('index.js', function() {
           assert.ok(rawContent.includes('Content-Type: text/calendar;method=REQUEST;name="invite.ics"'), 'Should include proper calendar MIME type');
           assert.ok(rawContent.includes('Content-Disposition: attachment; filename="invite.ics"'), 'Should include attachment disposition');
           assert.ok(rawContent.includes('Content-Transfer-Encoding: base64'), 'Should use base64 encoding');
-          
+
           // The ICS content is base64 encoded - we validate that the structure is correct
           // Gmail will decode this properly when it receives the email
 
@@ -172,10 +172,10 @@ describe('index.js', function() {
       index.sendCalendarInvite(data)
         .then(function() {
           var rawContent = sentEmails[0].input.Content.Raw.Data.toString();
-          
+
           // Check that the email contains base64 encoded content
           assert.ok(rawContent.includes('Content-Transfer-Encoding: base64'), 'Should contain base64 encoded ICS');
-          
+
           // For testing purposes, just check the structure for missing fields case
           // In real usage, Gmail will decode the base64 content properly
 
@@ -219,16 +219,16 @@ describe('index.js', function() {
       index.sendCalendarInvite(data)
         .then(function() {
           var rawContent = sentEmails[0].input.Content.Raw.Data.toString();
-          
+
           // Check that the email contains base64 encoded content
           assert.ok(rawContent.includes('Content-Transfer-Encoding: base64'), 'Should contain base64 encoded ICS');
-          
+
           // Decode the base64 content to verify timezone handling
           var icsMatch = rawContent.match(/Content-Transfer-Encoding: base64\r\n\r\n([A-Za-z0-9+/=\r\n]+)/);
           if (icsMatch) {
             var base64Content = icsMatch[1].replace(/\r\n/g, '');
             var icsContent = Buffer.from(base64Content, 'base64').toString('utf8');
-            
+
             // Check that local times are preserved (no timezone offset adjustment)
             // Summer time meeting at 11:00 should stay as 11:00 local time without Z suffix
             assert.ok(icsContent.includes('DTSTART:20240715T110000'), 'Should preserve local time (11am stays as 11am)');

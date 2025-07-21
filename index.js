@@ -574,7 +574,7 @@ function generateICS(eventInfo, attendeeEmail, organizerEmail, timezone = 'Europ
   const startDateFormatted = formatICSDate(startDate, timezone);
 
   // Calculate end time (default to 1 hour if no duration specified)
-  let duration = eventInfo.duration || 'PT1H';  // ISO 8601 duration format
+  let duration = eventInfo.duration || 'PT1H'; // ISO 8601 duration format
   let durationMs = 60 * 60 * 1000; // Default 1 hour in milliseconds
 
   // Parse ISO 8601 duration (PT1H = 1 hour, PT30M = 30 minutes, etc.)
