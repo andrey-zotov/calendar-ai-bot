@@ -85,12 +85,82 @@ EMAIL_KEY_PREFIX=
 4. Set up SES trigger
 
 #### IAM Permissions
-Ensure your Lambda execution role has the following permissions:
-- `ses:SendEmail`
-- `ses:SendRawEmail`
-- `logs:CreateLogGroup`
-- `logs:CreateLogStream`
-- `logs:PutLogEvents`
+
+Your Lambda function requires specific IAM permissions to work correctly. Create or update your Lambda execution role with the following permissions:
+
+**Required IAM Policy (JSON format):**
+```json
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": "logs:CreateLogGroup",
+            "Resource": "arn:aws:logs:your-region:your-account-number:*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "ses:SendEmail",
+                "ses:SendRawEmail"
+            ],
+            "Resource": [
+                "arn:aws:ses:your-region:your-account-number:identity/your-domain",
+                "arn:aws:ses:your-region:your-account-number:identity/your-email-in-the-domain",
+                "arn:aws:ses:your-region:your-account-number:configuration-set/your-configuration-set-name"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+            ],
+            "Resource": [
+                "arn:aws:logs:your-region:your-account-number:log-group:/aws/lambda/your-lambda:*"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:GetObject",
+                "s3:PutObject"
+            ],
+            "Resource": [
+                "arn:aws:s3:::your-s3-bucket-name/*"
+            ]
+        }
+    ]
+}
+```
+
+**Step-by-step IAM Setup:**
+
+1. **Create IAM Role for Lambda:**
+   - Go to AWS IAM Console → Roles → Create Role
+   - Select "Lambda" as the trusted entity
+   - Create a custom policy with the JSON above
+   - Name the role (e.g., `calendar-bot-lambda-role`)
+
+2. **Common Permission Issues and Solutions:**
+
+   **AccessDeniedException for ses:SendEmail:**
+   - Ensure your FROM_EMAIL is verified in AWS SES
+   - Add `ses:SendEmail` and `ses:SendRawEmail` permissions
+
+   **S3 GetObject errors:**
+   - Replace `your-s3-bucket-name` with your actual S3 bucket name
+   - Ensure the Lambda role can read from the S3 bucket where SES stores emails
+
+3. **Attach Role to Lambda:**
+   - In your Lambda function configuration
+   - Go to Configuration → Permissions
+   - Edit the execution role and select your created role
+
+4. **Verify SES Setup:**
+   - Verify your sending email address in AWS SES Console
+   - If in SES sandbox, also verify recipient email addresses
+   - Check SES sending limits and quotas
 
 
 ## Configuration
