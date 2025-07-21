@@ -197,11 +197,11 @@ ${emailContent}`;
     const response = await new Promise((resolve, reject) => {
       const req = httpsRequest(options, (res) => {
         let data = '';
-        
+
         res.on('data', (chunk) => {
           data += chunk;
         });
-        
+
         res.on('end', () => {
           if (res.statusCode >= 200 && res.statusCode < 300) {
             try {
@@ -215,11 +215,11 @@ ${emailContent}`;
           }
         });
       });
-      
+
       req.on('error', (error) => {
         reject(error);
       });
-      
+
       req.write(requestBody);
       req.end();
     });

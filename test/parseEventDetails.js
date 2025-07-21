@@ -40,15 +40,15 @@ describe('index.js', function() {
               }
             }
           };
-          
+
           const mockRequest = {
-            on: function(event, handler) {},
+            on: function() {},
             write: function() {},
             end: function() {
               setTimeout(() => callback(mockResponse), 0);
             }
           };
-          
+
           return mockRequest;
         }
       };
@@ -93,15 +93,15 @@ describe('index.js', function() {
               }
             }
           };
-          
+
           const mockRequest = {
-            on: function(event, handler) {},
+            on: function() {},
             write: function() {},
             end: function() {
               setTimeout(() => callback(mockResponse), 0);
             }
           };
-          
+
           return mockRequest;
         }
       };
@@ -136,15 +136,15 @@ describe('index.js', function() {
               }
             }
           };
-          
+
           const mockRequest = {
-            on: function(event, handler) {},
+            on: function() {},
             write: function() {},
             end: function() {
               setTimeout(() => callback(mockResponse), 0);
             }
           };
-          
+
           return mockRequest;
         }
       };
@@ -169,7 +169,6 @@ describe('index.js', function() {
         // Mock HTTPS request to verify subject extraction
         httpsRequest: function(options, callback) {
           // Verify that subject was included in the request body
-          const requestBody = '';
           const mockResponse = {
             statusCode: 200,
             on: function(event, handler) {
@@ -190,9 +189,9 @@ describe('index.js', function() {
               }
             }
           };
-          
+
           const mockRequest = {
-            on: function(event, handler) {},
+            on: function() {},
             write: function(body) {
               // Verify that subject was included in the request body
               const parsedBody = JSON.parse(body);
@@ -203,7 +202,7 @@ describe('index.js', function() {
               setTimeout(() => callback(mockResponse), 0);
             }
           };
-          
+
           return mockRequest;
         }
       };
