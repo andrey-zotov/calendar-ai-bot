@@ -11,7 +11,6 @@ console.log("Calendar AI Bot // Version 1.0.0");
 // Environment variables:
 // - OPENAI_API_KEY: OpenAI API key for content parsing
 // - OPENAI_MODEL: OpenAI model to use (default: gpt-3.5-turbo)
-// - MAX_TOKENS: Maximum tokens for OpenAI response (default: 500)
 // - FROM_EMAIL: Email address the bot sends from
 // - SUBJECT_PREFIX: Calendar invite emails subject prefix
 // - WHITELISTED_EMAILS: Comma-separated list of allowed sender emails
@@ -22,7 +21,6 @@ console.log("Calendar AI Bot // Version 1.0.0");
 const getConfig = () => ({
   openaiApiKey: process.env.OPENAI_API_KEY,
   openaiModel: process.env.OPENAI_MODEL || 'gpt-3.5-turbo',
-  maxTokens: parseInt(process.env.MAX_TOKENS) || 500,
   fromEmail: process.env.FROM_EMAIL || "noreply@example.com",
   subjectPrefix: process.env.SUBJECT_PREFIX || "Calendar Invite: ",
   emailBucket: process.env.EMAIL_BUCKET,
@@ -176,9 +174,7 @@ ${emailContent}`;
 
     const requestBody = JSON.stringify({
       model: data.config.openaiModel,
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: data.config.maxTokens,
-      temperature: 0.1
+      messages: [{ role: 'user', content: prompt }]
     });
 
     const options = {
@@ -271,6 +267,10 @@ exports.sendCalendarInvite = function(data) {
           Charset: 'UTF-8'
         },
         Body: {
+          Text: {
+            Data: `Hello,\n\nI've detected event information in your email and created a calendar invite for you:\n\nEvent: ${data.eventInfo.title}\nDate/Time: ${data.eventInfo.dateTime}\nLocation: ${data.eventInfo.location || 'Not specified'}\nDescription: ${data.eventInfo.description || 'No description'}\n\nCalendar Invite (copy and save as .ics file):\n\n${ics}\n\nBest regards,\nCalendar AI Bot`,
+            Charset: 'UTF-8'
+          },
           Html: {
             Data: `<html><body>
               <p>Hello,</p>
@@ -281,7 +281,8 @@ exports.sendCalendarInvite = function(data) {
                 <li><strong>Location:</strong> ${data.eventInfo.location || 'Not specified'}</li>
                 <li><strong>Description:</strong> ${data.eventInfo.description || 'No description'}</li>
               </ul>
-              <p>Please see the attached calendar invite.</p>
+              <p>Please see the calendar invite content below:</p>
+              <pre>${ics}</pre>
               <p>Best regards,<br>Calendar AI Bot</p>
             </body></html>`,
             Charset: 'UTF-8'
@@ -290,13 +291,6 @@ exports.sendCalendarInvite = function(data) {
       }
     },
     ReplyToAddresses: [data.config.fromEmail]
-  };
-
-  // Add calendar invite as attachment if we had a way to add attachments
-  // For now, we'll include the ICS content in the email body
-  params.Content.Simple.Body.Text = {
-    Data: `Hello,\n\nI've detected event information in your email and created a calendar invite for you:\n\nEvent: ${data.eventInfo.title}\nDate/Time: ${data.eventInfo.dateTime}\nLocation: ${data.eventInfo.location || 'Not specified'}\nDescription: ${data.eventInfo.description || 'No description'}\n\nCalendar Invite (copy and save as .ics file):\n\n${ics}\n\nBest regards,\nCalendar AI Bot`,
-    Charset: 'UTF-8'
   };
 
   data.log({
