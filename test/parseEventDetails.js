@@ -15,12 +15,13 @@ describe('index.js', function() {
           maxTokens: 500
         },
         log: function() {},
-        // Mock OpenAI for this test
-        openai: {
-          chat: {
-            completions: {
-              create: function() {
-                return Promise.resolve({
+        // Mock HTTPS request for this test
+        httpsRequest: function(options, callback) {
+          const mockResponse = {
+            statusCode: 200,
+            on: function(event, handler) {
+              if (event === 'data') {
+                handler(JSON.stringify({
                   choices: [{
                     message: {
                       content: JSON.stringify({
@@ -33,10 +34,22 @@ describe('index.js', function() {
                       })
                     }
                   }]
-                });
+                }));
+              } else if (event === 'end') {
+                handler();
               }
             }
-          }
+          };
+          
+          const mockRequest = {
+            on: function(event, handler) {},
+            write: function() {},
+            end: function() {
+              setTimeout(() => callback(mockResponse), 0);
+            }
+          };
+          
+          return mockRequest;
         }
       };
 
@@ -60,12 +73,13 @@ describe('index.js', function() {
           maxTokens: 500
         },
         log: function() {},
-        // Mock OpenAI for non-event response
-        openai: {
-          chat: {
-            completions: {
-              create: function() {
-                return Promise.resolve({
+        // Mock HTTPS request for non-event response
+        httpsRequest: function(options, callback) {
+          const mockResponse = {
+            statusCode: 200,
+            on: function(event, handler) {
+              if (event === 'data') {
+                handler(JSON.stringify({
                   choices: [{
                     message: {
                       content: JSON.stringify({
@@ -73,10 +87,22 @@ describe('index.js', function() {
                       })
                     }
                   }]
-                });
+                }));
+              } else if (event === 'end') {
+                handler();
               }
             }
-          }
+          };
+          
+          const mockRequest = {
+            on: function(event, handler) {},
+            write: function() {},
+            end: function() {
+              setTimeout(() => callback(mockResponse), 0);
+            }
+          };
+          
+          return mockRequest;
         }
       };
 
@@ -98,15 +124,28 @@ describe('index.js', function() {
           maxTokens: 500
         },
         log: function() {},
-        // Mock OpenAI to throw an error
-        openai: {
-          chat: {
-            completions: {
-              create: function() {
-                return Promise.reject(new Error('Invalid API key'));
+        // Mock HTTPS request to simulate API error
+        httpsRequest: function(options, callback) {
+          const mockResponse = {
+            statusCode: 401,
+            on: function(event, handler) {
+              if (event === 'data') {
+                handler('Invalid API key');
+              } else if (event === 'end') {
+                handler();
               }
             }
-          }
+          };
+          
+          const mockRequest = {
+            on: function(event, handler) {},
+            write: function() {},
+            end: function() {
+              setTimeout(() => callback(mockResponse), 0);
+            }
+          };
+          
+          return mockRequest;
         }
       };
 
@@ -127,15 +166,15 @@ describe('index.js', function() {
           maxTokens: 500
         },
         log: function() {},
-        // Mock OpenAI
-        openai: {
-          chat: {
-            completions: {
-              create: function(params) {
-                // Verify that subject was included in the prompt
-                assert.ok(params.messages[0].content.includes('Subject: Important Meeting'),
-                  'Subject should be included in OpenAI prompt');
-                return Promise.resolve({
+        // Mock HTTPS request to verify subject extraction
+        httpsRequest: function(options, callback) {
+          // Verify that subject was included in the request body
+          const requestBody = '';
+          const mockResponse = {
+            statusCode: 200,
+            on: function(event, handler) {
+              if (event === 'data') {
+                handler(JSON.stringify({
                   choices: [{
                     message: {
                       content: JSON.stringify({
@@ -145,10 +184,27 @@ describe('index.js', function() {
                       })
                     }
                   }]
-                });
+                }));
+              } else if (event === 'end') {
+                handler();
               }
             }
-          }
+          };
+          
+          const mockRequest = {
+            on: function(event, handler) {},
+            write: function(body) {
+              // Verify that subject was included in the request body
+              const parsedBody = JSON.parse(body);
+              assert.ok(parsedBody.messages[0].content.includes('Subject: Important Meeting'),
+                'Subject should be included in OpenAI prompt');
+            },
+            end: function() {
+              setTimeout(() => callback(mockResponse), 0);
+            }
+          };
+          
+          return mockRequest;
         }
       };
 

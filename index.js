@@ -2,7 +2,7 @@
 
 const { S3Client, GetObjectCommand } = require("@aws-sdk/client-s3");
 const { SESv2Client, SendEmailCommand } = require("@aws-sdk/client-sesv2");
-const OpenAI = require('openai');
+const https = require('https');
 
 console.log("Calendar AI Bot // Version 1.0.0");
 
@@ -158,8 +158,6 @@ exports.parseEventDetails = async function(data) {
       message: "Parsing email content with OpenAI"
     });
 
-    const openai = data.openai || new OpenAI({ apiKey: data.config.openaiApiKey });
-
     const prompt = `Parse the following email content and extract event information. If this email contains information about a meeting, event, or appointment, return a JSON object with the following structure:
 
 {
@@ -176,14 +174,55 @@ If no event information is found, return: {"hasEvent": false}
 Email content:
 ${emailContent}`;
 
-    const completion = await openai.chat.completions.create({
+    const requestBody = JSON.stringify({
       model: data.config.openaiModel,
       messages: [{ role: 'user', content: prompt }],
       max_tokens: data.config.maxTokens,
       temperature: 0.1
     });
 
-    const response = completion.choices[0].message.content.trim();
+    const options = {
+      hostname: 'api.openai.com',
+      port: 443,
+      path: '/v1/chat/completions',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${data.config.openaiApiKey}`,
+        'Content-Length': Buffer.byteLength(requestBody)
+      }
+    };
+
+    const httpsRequest = data.httpsRequest || https.request;
+    const response = await new Promise((resolve, reject) => {
+      const req = httpsRequest(options, (res) => {
+        let data = '';
+        
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+        
+        res.on('end', () => {
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            try {
+              const parsed = JSON.parse(data);
+              resolve(parsed.choices[0].message.content.trim());
+            } catch (e) {
+              reject(new Error('Failed to parse OpenAI response: ' + e.message));
+            }
+          } else {
+            reject(new Error(`OpenAI API error: ${res.statusCode} ${data}`));
+          }
+        });
+      });
+      
+      req.on('error', (error) => {
+        reject(error);
+      });
+      
+      req.write(requestBody);
+      req.end();
+    });
     data.eventInfo = JSON.parse(response);
 
     data.log({
