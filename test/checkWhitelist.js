@@ -137,5 +137,133 @@ describe('index.js', function() {
         })
         .catch(done);
     });
+
+    it('should ignore calendar invitation acceptance emails', function(done) {
+      var data = {
+        email: {
+          commonHeaders: {
+            from: ['john@example.com'],
+            subject: 'Accepted: Team Meeting Tomorrow'
+          }
+        },
+        config: {
+          whitelistedEmails: ['john@example.com']
+        },
+        log: function() {},
+        callback: function() {
+          done(); // Should call callback to exit early for invitation responses
+        },
+        recipients: ['info@example.com']
+      };
+      // This should call the callback and not return a promise
+      index.checkWhitelist(data);
+    });
+
+    it('should ignore calendar invitation decline emails', function(done) {
+      var data = {
+        email: {
+          commonHeaders: {
+            from: ['jane@example.com'],
+            subject: 'Declined: Weekly standup meeting'
+          }
+        },
+        config: {
+          whitelistedEmails: ['jane@example.com']
+        },
+        log: function() {},
+        callback: function() {
+          done(); // Should call callback to exit early for invitation responses
+        },
+        recipients: ['info@example.com']
+      };
+      // This should call the callback and not return a promise
+      index.checkWhitelist(data);
+    });
+
+    it('should ignore emails from calendar systems', function(done) {
+      var data = {
+        email: {
+          commonHeaders: {
+            from: ['calendar-server@example.com'],
+            subject: 'Meeting Response'
+          }
+        },
+        config: {
+          whitelistedEmails: ['calendar-server@example.com']
+        },
+        log: function() {},
+        callback: function() {
+          done(); // Should call callback to exit early for calendar system emails
+        },
+        recipients: ['info@example.com']
+      };
+      // This should call the callback and not return a promise
+      index.checkWhitelist(data);
+    });
+
+    it('should ignore Google Calendar notification emails', function(done) {
+      var data = {
+        email: {
+          commonHeaders: {
+            from: ['calendar.google.com'],
+            subject: 'John has accepted your invitation'
+          }
+        },
+        config: {
+          whitelistedEmails: ['calendar.google.com']
+        },
+        log: function() {},
+        callback: function() {
+          done(); // Should call callback to exit early for Google Calendar emails
+        },
+        recipients: ['info@example.com']
+      };
+      // This should call the callback and not return a promise
+      index.checkWhitelist(data);
+    });
+
+    it('should process legitimate event emails with normal subjects', function(done) {
+      var data = {
+        email: {
+          commonHeaders: {
+            from: ['john@example.com'],
+            subject: 'Team Meeting Tomorrow at 2PM'
+          }
+        },
+        config: {
+          whitelistedEmails: ['john@example.com']
+        },
+        log: function() {},
+        recipients: ['info@example.com']
+      };
+      index.checkWhitelist(data)
+        .then(function(result) {
+          assert.equal(result.senderEmail, 'john@example.com',
+            'Should process legitimate event emails normally');
+          done();
+        })
+        .catch(done);
+    });
+
+    it('should ignore tentative response emails', function(done) {
+      var data = {
+        email: {
+          commonHeaders: {
+            from: ['sarah@example.com'],
+            subject: 'Tentative: Project kickoff meeting'
+          }
+        },
+        config: {
+          whitelistedEmails: ['sarah@example.com']
+        },
+        log: function() {},
+        callback: function() {
+          done(); // Should call callback to exit early for tentative responses
+        },
+        recipients: ['info@example.com']
+      };
+      // This should call the callback and not return a promise
+      index.checkWhitelist(data);
+    });
   });
 });

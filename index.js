@@ -58,7 +58,68 @@ exports.parseEvent = function(data) {
 };
 
 /**
- * Checks if the sender email is in the whitelist.
+ * Detects if the email is a calendar invitation response (accept/decline notification).
+ *
+ * @param {object} data - Data bundle with context, email, etc.
+ *
+ * @return {boolean} - True if this is an invitation response email.
+ */
+function isInvitationResponse(data) {
+  const subject = data.email.commonHeaders.subject || '';
+  const subjectLower = subject.toLowerCase();
+  
+  // Check for common invitation response patterns in subject
+  const responsePatterns = [
+    'accepted:',
+    'declined:',
+    'tentative:',
+    'accepted invitation:',
+    'declined invitation:',
+    'tentative invitation:',
+    'has accepted',
+    'has declined',
+    'has tentatively accepted',
+    'response to your invitation',
+    'invitation response',
+    're: invitation',
+    'meeting response',
+    'calendar response'
+  ];
+  
+  for (const pattern of responsePatterns) {
+    if (subjectLower.includes(pattern)) {
+      return true;
+    }
+  }
+  
+  // Check sender patterns - common calendar systems
+  const senderEmail = data.email.commonHeaders.from[0];
+  const extractedEmail = senderEmail.match(/<(.+)>/) ? senderEmail.match(/<(.+)>/)[1] : senderEmail;
+  const senderLower = extractedEmail.toLowerCase();
+  
+  const calendarSenders = [
+    'calendar-server@',
+    'noreply@calendar',
+    'calendar@',
+    'no-reply@calendar',
+    'calendar-notification@',
+    'calendar.google.com',
+    'outlook.office365.com',
+    'exchange.',
+    'calendar-daemon@'
+  ];
+  
+  for (const sender of calendarSenders) {
+    if (senderLower.includes(sender)) {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+/**
+ * Checks if the sender email is in the whitelist and filters out invitation responses.
  *
  * @param {object} data - Data bundle with context, email, etc.
  *
@@ -71,6 +132,16 @@ exports.checkWhitelist = function(data) {
 
   data.senderEmail = normalizedEmail;
   data.originalRecipients = data.recipients;
+
+  // Check if this is an invitation response email and skip processing
+  if (isInvitationResponse(data)) {
+    data.log({
+      message: `Email from ${extractedEmail} appears to be a calendar invitation response. Ignoring.`,
+      level: "info",
+      subject: data.email.commonHeaders.subject
+    });
+    return data.callback();
+  }
 
   if (data.config.whitelistedEmails.length === 0) {
     data.log({
