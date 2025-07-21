@@ -130,7 +130,6 @@ Your Lambda function requires specific IAM permissions to work correctly. Create
 |----------|-------------|----------|
 | `OPENAI_API_KEY` | Your OpenAI API key | Yes |
 | `OPENAI_MODEL` | OpenAI model to use (default: gpt-3.5-turbo) | No |
-| `MAX_TOKENS` | Maximum tokens for OpenAI response (default: 500) | No |
 | `FROM_EMAIL` | Email address the bot sends from | Yes |
 | `WHITELISTED_EMAILS` | Comma-separated list of allowed sender emails | Yes |
 | `ALLOW_PLUS_SIGN` | Enables support for plus sign suffixes on email addresses. | No |
