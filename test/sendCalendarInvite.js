@@ -129,10 +129,6 @@ describe('index.js', function() {
           // Check that the email contains base64 encoded content
           assert.ok(rawContent.includes('Content-Transfer-Encoding: base64'), 'Should contain base64 encoded ICS');
 
-          // For testing purposes, just validate the test data we're sending
-          // In real usage, Gmail will decode the base64 content properly
-          var icsContent = 'SUMMARY:Test Event with Special Characters & Symbols\nLOCATION:Room 123, Building A\nATTENDEE\nORGANIZER';
-
           // Check that the email structure includes proper calendar MIME type
           assert.ok(rawContent.includes('Content-Type: text/calendar;method=REQUEST;name="invite.ics"'), 'Should include proper calendar MIME type');
           assert.ok(rawContent.includes('Content-Disposition: attachment; filename="invite.ics"'), 'Should include attachment disposition');

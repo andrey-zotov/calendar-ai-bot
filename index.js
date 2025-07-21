@@ -499,45 +499,6 @@ Calendar AI Bot`;
 };
 
 /**
- * Converts a timezone string to an offset from UTC.
- *
- * @param {string} timezone - Timezone identifier (e.g., 'Europe/London')
- * @param {Date} date - Date to get offset for (needed for DST)
- *
- * @return {number} - Offset in minutes from UTC (positive for ahead, negative for behind)
- */
-function getTimezoneOffset(timezone, date) {
-  // Simple mapping for common timezones (in a production app, use a proper timezone library)
-  const timezoneOffsets = {
-    'Europe/London': () => {
-      // British Summer Time (BST) is UTC+1 (Mar-Oct), GMT is UTC+0 (Nov-Feb)
-      const year = date.getFullYear();
-      const month = date.getMonth(); // 0-indexed
-      const day = date.getDate();
-      const hour = date.getHours();
-
-      // Approximate BST dates (last Sunday in March to last Sunday in October)
-      // This is a simplified check - in production use a proper timezone library
-      if (month > 2 && month < 9) return 60; // BST (UTC+1)
-      if (month === 2) { // March
-        const lastSunday = 31 - new Date(year, 2, 31).getDay();
-        return day >= lastSunday ? 60 : 0;
-      }
-      if (month === 9) { // October
-        const lastSunday = 31 - new Date(year, 9, 31).getDay();
-        return day < lastSunday ? 60 : 0;
-      }
-      return 0; // GMT (UTC+0)
-    },
-    'UTC': () => 0,
-    'GMT': () => 0
-  };
-
-  const offsetFunc = timezoneOffsets[timezone] || timezoneOffsets['Europe/London'];
-  return offsetFunc();
-}
-
-/**
  * Formats a date for ICS with timezone support.
  *
  * @param {Date} date - Date to format
