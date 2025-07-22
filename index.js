@@ -177,8 +177,8 @@ exports.checkDkimVerification = function(data) {
     return Promise.resolve(data);
   }
 
-  // Extract Authentication-Results header
-  const authResultsMatch = data.emailData.match(/^authentication-results:\s*(.*)/mi);
+  // Extract Authentication-Results header (handle multiline folding)
+  const authResultsMatch = data.emailData.match(/^authentication-results:\s*(.*(?:\r?\n[ \t]+.*)*)/mi);
 
   if (!authResultsMatch) {
     data.log({
@@ -191,7 +191,14 @@ exports.checkDkimVerification = function(data) {
     return Promise.resolve(data);
   }
 
-  const authResults = authResultsMatch[1].toLowerCase();
+  const authResultsOrig = authResultsMatch[1].replace(/\r?\n[ \t]+/g, ' ').trim();
+
+  data.log({
+    message: "Authentication-Results header found: " + authResultsOrig,
+    level: "debug"
+  });
+
+  const authResults = authResultsOrig.toLowerCase();
 
   // Check for DKIM pass status
   // Common formats:
