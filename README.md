@@ -139,6 +139,7 @@ Your Lambda function requires specific IAM permissions to work correctly. Create
 | `SUBJECT_PREFIX` | Invite emails subject will contain this prefix | No |
 | `DEFAULT_TIMEZONE` | Timezone for event times (default: Europe/London) | No |
 | `REQUIRE_DKIM_VERIFICATION` | Require DKIM verification to pass before processing emails (default: false) | No |
+| `LOG_LEVEL` | Logging level: DEBUG, INFO, ERROR (default: INFO) | No |
 | `EMAIL_BUCKET` | AWS region for SES operations | Yes |
 | `EMAIL_KEY_PREFIX` | S3 key name prefix where SES stores email. Include the trailing slash. | No |
 

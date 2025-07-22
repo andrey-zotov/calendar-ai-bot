@@ -17,6 +17,7 @@ console.log("Calendar AI Bot // Version 1.0.0");
 // - ALLOW_PLUS_SIGN: Enables support for plus sign suffixes
 // - DEFAULT_TIMEZONE: Timezone for event times (default: Europe/London)
 // - REQUIRE_DKIM_VERIFICATION: Require DKIM verification to pass before processing (default: false)
+// - LOG_LEVEL: Logging level: DEBUG, INFO, ERROR (default: INFO)
 // - EMAIL_BUCKET: S3 bucket name where SES stores emails
 // - EMAIL_KEY_PREFIX: S3 key name prefix where SES stores email
 
@@ -30,9 +31,32 @@ const getConfig = () => ({
   allowPlusSign: process.env.ALLOW_PLUS_SIGN !== 'false',
   defaultTimezone: process.env.DEFAULT_TIMEZONE || 'Europe/London',
   requireDkimVerification: process.env.REQUIRE_DKIM_VERIFICATION === 'true',
+  logLevel: process.env.LOG_LEVEL || 'INFO',
   whitelistedEmails: process.env.WHITELISTED_EMAILS ?
       process.env.WHITELISTED_EMAILS.split(',').map(email => email.trim().toLowerCase()) : []
 });
+
+/**
+ * Creates a simple logger that respects the configured log level.
+ *
+ * @param {string} logLevel - The logging level: 'DEBUG', 'INFO', or 'ERROR'
+ * @param {function} baseLogger - The base logging function (usually console.log)
+ *
+ * @return {function} - Smart logging function
+ */
+function createLogger(logLevel, baseLogger) {
+  const levels = { DEBUG: 0, INFO: 1, ERROR: 2 };
+  const currentLevel = levels[logLevel.toUpperCase()] || levels.INFO;
+
+  return function(logEntry) {
+    const entryLevel = logEntry.level ? logEntry.level.toUpperCase() : 'INFO';
+    const entryLevelNum = levels[entryLevel] || levels.INFO;
+
+    if (entryLevelNum >= currentLevel) {
+      baseLogger(logEntry);
+    }
+  };
+}
 
 /**
  * Parses the SES event record provided for the `mail` and `recipients` data.
@@ -139,7 +163,7 @@ exports.checkDkimVerification = function(data) {
   if (!data.config.requireDkimVerification) {
     data.log({
       message: "DKIM verification not required. Skipping check.",
-      level: "info"
+      level: "debug"
     });
     return Promise.resolve(data);
   }
@@ -179,8 +203,7 @@ exports.checkDkimVerification = function(data) {
   if (dkimPassPattern.test(authResults)) {
     data.log({
       message: `DKIM verification passed for ${data.senderEmail}`,
-      level: "info",
-      authResults: authResults
+      level: "info"
     });
     return Promise.resolve(data);
   }
@@ -191,8 +214,7 @@ exports.checkDkimVerification = function(data) {
   if (dkimFailPattern.test(authResults)) {
     data.log({
       message: `DKIM verification failed for ${data.senderEmail}. Email rejected.`,
-      level: "warn",
-      authResults: authResults
+      level: "info"
     });
     data.earlyTermination = true;
     data.callback();
@@ -202,8 +224,7 @@ exports.checkDkimVerification = function(data) {
   // If DKIM is not mentioned in auth results, treat as failed when verification is required
   data.log({
     message: `No DKIM information found in Authentication-Results for ${data.senderEmail}. Email rejected.`,
-    level: "warn",
-    authResults: authResults
+    level: "info"
   });
   data.earlyTermination = true;
   data.callback();
@@ -276,7 +297,7 @@ exports.fetchMessage = function(data) {
   }
 
   data.log({
-    level: "info",
+    level: "debug",
     message: "Fetching email at s3://" + data.config.emailBucket + '/' +
       data.config.emailKeyPrefix + data.email.messageId
   });
@@ -328,7 +349,7 @@ exports.parseEventDetails = async function(data) {
     const emailContent = `Subject: ${subject}\n\n${body.trim()}`;
 
     data.log({
-      level: "info",
+      level: "debug",
       message: "Parsing email content with OpenAI"
     });
 
@@ -405,7 +426,7 @@ ${emailContent}`;
     data.eventInfo = JSON.parse(response);
 
     data.log({
-      level: "info",
+      level: "debug",
       message: "OpenAI response parsed",
       eventInfo: data.eventInfo
     });
@@ -447,7 +468,7 @@ exports.sendCalendarInvite = function(data) {
 
   // Validate required data
   data.log({
-    level: "info",
+    level: "debug",
     message: "Validating email parameters",
     senderEmail: data.senderEmail,
     fromEmail: data.config.fromEmail,
@@ -562,13 +583,13 @@ Calendar AI Bot`;
   };
 
   data.log({
-    level: "info",
+    level: "debug",
     message: `Sending calendar invite to ${data.senderEmail} for event: ${data.eventInfo.title}`,
     sesParams: JSON.stringify(params, null, 2)
   });
 
   return new Promise(function(resolve, reject) {
-    data.ses.send(new SendEmailCommand(params), function(err, result) {
+    data.ses.send(new SendEmailCommand(params), function(err) {
       if (err) {
         data.log({
           level: "error",
@@ -580,8 +601,7 @@ Calendar AI Bot`;
       }
       data.log({
         level: "info",
-        message: "Calendar invite sent successfully.",
-        result: result
+        message: "Calendar invite sent successfully."
       });
       resolve(data);
     });
@@ -705,7 +725,7 @@ exports.handler = function(event, context, callback, overrides) {
     callback: callback,
     context: context,
     config: overrides && overrides.config ? overrides.config : config,
-    log: overrides && overrides.log ? overrides.log : console.log,
+    log: overrides && overrides.log ? overrides.log : createLogger(config.logLevel, console.log),
     ses: overrides && overrides.ses ? overrides.ses : new SESv2Client(),
     s3: overrides && overrides.s3 ?
       overrides.s3 : new S3Client({signatureVersion: 'v4'})
