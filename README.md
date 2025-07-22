@@ -138,6 +138,7 @@ Your Lambda function requires specific IAM permissions to work correctly. Create
 | `ALLOW_PLUS_SIGN` | Enables support for plus sign suffixes on email addresses. | No |
 | `SUBJECT_PREFIX` | Invite emails subject will contain this prefix | No |
 | `DEFAULT_TIMEZONE` | Timezone for event times (default: Europe/London) | No |
+| `REQUIRE_DKIM_VERIFICATION` | Require DKIM verification to pass before processing emails (default: false) | No |
 | `EMAIL_BUCKET` | AWS region for SES operations | Yes |
 | `EMAIL_KEY_PREFIX` | S3 key name prefix where SES stores email. Include the trailing slash. | No |
 
@@ -150,15 +151,36 @@ The bot only processes emails from addresses in the whitelist. Add email address
 WHITELISTED_EMAILS=john@company.com,jane@company.com,team@company.com
 ```
 
+### DKIM Verification (Security)
+
+For enhanced security, you can enable DKIM verification to ensure emails haven't been spoofed:
+
+```env
+REQUIRE_DKIM_VERIFICATION=true
+```
+
+**When enabled:**
+- The bot checks the `Authentication-Results` header from AWS SES
+- Only emails with `dkim=pass` status are processed
+- Emails with failed DKIM verification (`dkim=fail`, `dkim=none`, etc.) are rejected
+- Emails without DKIM information are rejected
+
+**When disabled (default):**
+- DKIM verification is skipped
+- All whitelisted emails are processed regardless of DKIM status
+
+**Note:** DKIM verification adds an extra layer of security but may reject legitimate emails from domains with misconfigured DKIM records. Test thoroughly before enabling in production.
+
 ## Usage
 
 ### How It Works
 
 1. **Email Reception**: The bot receives emails via AWS SES
 2. **Whitelist Check**: Verifies the sender is in the whitelist
-3. **Content Analysis**: Uses OpenAI to extract event information
-4. **Calendar Generation**: Creates calendar invite with extracted details
-5. **Response**: Sends calendar invite back to the original sender
+3. **DKIM Verification**: Checks email authenticity (if enabled)
+4. **Content Analysis**: Uses OpenAI to extract event information
+5. **Calendar Generation**: Creates calendar invite with extracted details
+6. **Response**: Sends calendar invite back to the original sender
 
 ### Email Format
 
