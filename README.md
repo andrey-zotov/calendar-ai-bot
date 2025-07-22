@@ -193,15 +193,15 @@ The bot can parse event information from various email formats. It looks for:
 ### Example Email
 
 ```
-Subject: Team Meeting Tomorrow
+Subject: Orthodontic appointment
 
-Hi team,
+Dear Sir,
 
-Let's have a meeting tomorrow at 2 PM in the conference room.
-We'll discuss the Q4 strategy.
+Following your recent orthodontic appointment, we are writing to let you know that the Orthodontist has now assessed and requested that we arrange your next visit.
+Therefore, an appropriate appointment has been arranged for you on Wednesday 20/08/2025 at 10:25. The appointment will take place at 4 High Street.
 
-Best regards,
-John
+Kind Regards,
+Admin Team
 ```
 
 ## API Reference
@@ -261,21 +261,6 @@ npm test
    - Verify account has sufficient credits
    - Check rate limits
 
-### Debugging
-
-Enable debug logging by setting the `DEBUG` environment variable:
-
-```env
-DEBUG=true
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Submit a pull request
 
 ## License
 
@@ -286,10 +271,3 @@ This project is licensed under the MIT License - see the [LICENSE-MIT](LICENSE-M
 - Inspired by [aws-lambda-ses-forwarder](https://github.com/arithmetric/aws-lambda-ses-forwarder)
 - Uses OpenAI API for intelligent email parsing
 - Built with AWS Lambda and SES
-
-## Support
-
-For support and questions:
-- Check the troubleshooting section
-- Review AWS and OpenAI documentation
-- Create an issue in the GitHub repository
