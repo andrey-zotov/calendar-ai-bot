@@ -1,6 +1,6 @@
 {
   "name": "calendar-ai-bot",
-  "version": "1.0.0",
+  "version": "1.1.1",
   "description": "Serverless email calendar invite creation bot using AWS Lambda, SES and OpenAI API",
   "main": "index.js",
   "scripts": {
