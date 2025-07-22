@@ -6,7 +6,7 @@ An AWS Lambda-based email bot that automatically creates and sends calendar invi
 
 This bot monitors incoming emails sent to a specific email address and uses OpenAI's API to intelligently parse event details from email content. When event information is detected, it automatically generates and sends calendar invites to the original sender.
 
-<img width="828" height="813" alt="image" src="https://github.com/user-attachments/assets/09c0ffb8-454e-44d5-a334-91c796946ce7" />
+<img width="1184" height="1023" alt="image" src="https://github.com/user-attachments/assets/b04caa6b-44dc-4360-bb38-91173f176dc6" />
 
 
 ## Features
