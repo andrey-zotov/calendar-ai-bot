@@ -37,7 +37,7 @@ const getConfig = () => ({
 });
 
 /**
- * Creates a simple logger that respects the configured log level.
+ * Creates a simple logger that respects the configured log level and formats for CloudWatch.
  *
  * @param {string} logLevel - The logging level: 'DEBUG', 'INFO', or 'ERROR'
  * @param {function} baseLogger - The base logging function (usually console.log)
@@ -53,7 +53,32 @@ function createLogger(logLevel, baseLogger) {
     const entryLevelNum = levels[entryLevel] || levels.INFO;
 
     if (entryLevelNum >= currentLevel) {
-      baseLogger(logEntry);
+      const { level, message, ...additionalData } = logEntry;
+
+      // Use appropriate console method for CloudWatch log level recognition
+      let logFunction;
+      switch (entryLevel) {
+        case 'ERROR':
+          logFunction = console.error;
+          break;
+        case 'WARN':
+          logFunction = console.warn;
+          break;
+        case 'DEBUG':
+          logFunction = console.debug;
+          break;
+        default:
+          logFunction = console.log;
+          break;
+      }
+
+      if (Object.keys(additionalData).length > 0) {
+        // Log with structured data
+        logFunction(message, additionalData);
+      } else {
+        // Log simple message
+        logFunction(message);
+      }
     }
   };
 }
@@ -609,8 +634,7 @@ Calendar AI Bot`;
 
   data.log({
     level: "debug",
-    message: `Sending calendar invite to ${data.senderEmail} for event: ${data.eventInfo.title}`,
-    sesParams: JSON.stringify(params, null, 2)
+    message: `Sending calendar invite to ${data.senderEmail} for event: ${data.eventInfo.title}`
   });
 
   return new Promise(function(resolve, reject) {
