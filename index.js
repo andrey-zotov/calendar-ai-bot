@@ -16,7 +16,7 @@ console.log("Calendar AI Bot // Version 1.0.0");
 // - WHITELISTED_EMAILS: Comma-separated list of allowed sender emails
 // - ALLOW_PLUS_SIGN: Enables support for plus sign suffixes
 // - DEFAULT_TIMEZONE: Timezone for event times (default: Europe/London)
-// - REQUIRE_DKIM_VERIFICATION: Require DKIM verification to pass before processing (default: false)
+// - REQUIRE_EMAIL_VERIFICATION: Require both SPF and DKIM verification to pass before processing (default: false)
 // - LOG_LEVEL: Logging level: DEBUG, INFO, ERROR (default: INFO)
 // - EMAIL_BUCKET: S3 bucket name where SES stores emails
 // - EMAIL_KEY_PREFIX: S3 key name prefix where SES stores email
@@ -30,14 +30,14 @@ const getConfig = () => ({
   emailKeyPrefix: process.env.EMAIL_KEY_PREFIX || "emails/",
   allowPlusSign: process.env.ALLOW_PLUS_SIGN !== 'false',
   defaultTimezone: process.env.DEFAULT_TIMEZONE || 'Europe/London',
-  requireDkimVerification: process.env.REQUIRE_DKIM_VERIFICATION === 'true',
+  requireEmailVerification: process.env.REQUIRE_EMAIL_VERIFICATION === 'true',
   logLevel: process.env.LOG_LEVEL || 'INFO',
   whitelistedEmails: process.env.WHITELISTED_EMAILS ?
       process.env.WHITELISTED_EMAILS.split(',').map(email => email.trim().toLowerCase()) : []
 });
 
 /**
- * Creates a simple logger that respects the configured log level.
+ * Creates a simple logger that respects the configured log level and formats for CloudWatch.
  *
  * @param {string} logLevel - The logging level: 'DEBUG', 'INFO', or 'ERROR'
  * @param {function} baseLogger - The base logging function (usually console.log)
@@ -53,7 +53,32 @@ function createLogger(logLevel, baseLogger) {
     const entryLevelNum = levels[entryLevel] || levels.INFO;
 
     if (entryLevelNum >= currentLevel) {
-      baseLogger(logEntry);
+      const { level, message, ...additionalData } = logEntry;
+
+      // Use appropriate console method for CloudWatch log level recognition
+      let logFunction;
+      switch (entryLevel) {
+        case 'ERROR':
+          logFunction = console.error;
+          break;
+        case 'WARN':
+          logFunction = console.warn;
+          break;
+        case 'DEBUG':
+          logFunction = console.debug;
+          break;
+        default:
+          logFunction = console.log;
+          break;
+      }
+
+      if (Object.keys(additionalData).length > 0) {
+        // Log with structured data
+        logFunction(message, additionalData);
+      } else {
+        // Log simple message
+        logFunction(message);
+      }
     }
   };
 }
@@ -147,22 +172,22 @@ function isInvitationResponse(data) {
 }
 
 /**
- * Checks DKIM verification status from the email headers.
+ * Checks SPF and DKIM verification status from the email headers.
  *
  * @param {object} data - Data bundle with context, email, etc.
  *
  * @return {object} - Promise resolved with data.
  */
-exports.checkDkimVerification = function(data) {
+exports.checkEmailVerification = function(data) {
   // Skip processing if early termination was requested
   if (data.earlyTermination) {
     return Promise.resolve(data);
   }
 
-  // If DKIM verification is not required, skip this check
-  if (!data.config.requireDkimVerification) {
+  // If email verification is not required, skip this check
+  if (!data.config.requireEmailVerification) {
     data.log({
-      message: "DKIM verification not required. Skipping check.",
+      message: "Email verification not required. Skipping check.",
       level: "debug"
     });
     return Promise.resolve(data);
@@ -171,18 +196,18 @@ exports.checkDkimVerification = function(data) {
   // Check if we have email data with headers
   if (!data.emailData) {
     data.log({
-      message: "No email data available for DKIM verification check.",
+      message: "No email data available for email verification check.",
       level: "warn"
     });
     return Promise.resolve(data);
   }
 
-  // Extract Authentication-Results header
-  const authResultsMatch = data.emailData.match(/^authentication-results:\s*(.*)/mi);
+  // Extract Authentication-Results header (handle multiline folding)
+  const authResultsMatch = data.emailData.match(/^authentication-results:\s*(.*(?:\r?\n[ \t]+.*)*)/mi);
 
   if (!authResultsMatch) {
     data.log({
-      message: "No Authentication-Results header found. DKIM verification required but not available.",
+      message: "No Authentication-Results header found. Email verification required but not available.",
       level: "error",
       senderEmail: data.senderEmail
     });
@@ -191,7 +216,21 @@ exports.checkDkimVerification = function(data) {
     return Promise.resolve(data);
   }
 
-  const authResults = authResultsMatch[1].toLowerCase();
+  const authResultsOrig = authResultsMatch[1].replace(/\r?\n[ \t]+/g, ' ').trim();
+
+  data.log({
+    message: "Authentication-Results header found: " + authResultsOrig,
+    level: "debug"
+  });
+
+  const authResults = authResultsOrig.toLowerCase();
+
+  // Check for SPF pass status
+  // Common formats:
+  // - "spf=pass"
+  // - "spf=pass smtp.mailfrom=example.com"
+  const spfPassPattern = /spf\s*=\s*pass/i;
+  const spfPass = spfPassPattern.test(authResults);
 
   // Check for DKIM pass status
   // Common formats:
@@ -199,31 +238,42 @@ exports.checkDkimVerification = function(data) {
   // - "dkim=pass (1024-bit key)"
   // - "dkim=pass header.d=example.com"
   const dkimPassPattern = /dkim\s*=\s*pass/i;
+  const dkimPass = dkimPassPattern.test(authResults);
 
-  if (dkimPassPattern.test(authResults)) {
-    data.log({
-      message: `DKIM verification passed for ${data.senderEmail}`,
-      level: "info"
-    });
-    return Promise.resolve(data);
-  }
+  // Check for SPF fail or other non-pass statuses
+  const spfFailPattern = /spf\s*=\s*(fail|none|neutral|softfail|policy|permerror|temperror)/i;
+  const spfFail = spfFailPattern.test(authResults);
 
   // Check for DKIM fail or other non-pass statuses
   const dkimFailPattern = /dkim\s*=\s*(fail|none|neutral|policy|permerror|temperror)/i;
+  const dkimFail = dkimFailPattern.test(authResults);
 
-  if (dkimFailPattern.test(authResults)) {
+  // Log verification status
+  data.log({
+    message: `Email verification status for ${data.senderEmail} - SPF: ${spfPass ? 'pass' : (spfFail ? 'fail' : 'not found')}, DKIM: ${dkimPass ? 'pass' : (dkimFail ? 'fail' : 'not found')}`,
+    level: "debug"
+  });
+
+  // Both SPF and DKIM must pass for verification to succeed
+  if (spfPass && dkimPass) {
     data.log({
-      message: `DKIM verification failed for ${data.senderEmail}. Email rejected.`,
+      message: `Email verification passed for ${data.senderEmail} (SPF and DKIM both pass)`,
       level: "info"
     });
-    data.earlyTermination = true;
-    data.callback();
     return Promise.resolve(data);
   }
 
-  // If DKIM is not mentioned in auth results, treat as failed when verification is required
+  // If either verification fails or is missing, reject the email
+  let failureReason = [];
+  if (!spfPass) {
+    failureReason.push(spfFail ? 'SPF failed' : 'SPF not found');
+  }
+  if (!dkimPass) {
+    failureReason.push(dkimFail ? 'DKIM failed' : 'DKIM not found');
+  }
+
   data.log({
-    message: `No DKIM information found in Authentication-Results for ${data.senderEmail}. Email rejected.`,
+    message: `Email verification failed for ${data.senderEmail}: ${failureReason.join(', ')}. Email rejected.`,
     level: "info"
   });
   data.earlyTermination = true;
@@ -584,8 +634,7 @@ Calendar AI Bot`;
 
   data.log({
     level: "debug",
-    message: `Sending calendar invite to ${data.senderEmail} for event: ${data.eventInfo.title}`,
-    sesParams: JSON.stringify(params, null, 2)
+    message: `Sending calendar invite to ${data.senderEmail} for event: ${data.eventInfo.title}`
   });
 
   return new Promise(function(resolve, reject) {
@@ -716,7 +765,7 @@ exports.handler = function(event, context, callback, overrides) {
         exports.parseEvent,
         exports.checkWhitelist,
         exports.fetchMessage,
-        exports.checkDkimVerification,
+        exports.checkEmailVerification,
         exports.parseEventDetails,
         exports.sendCalendarInvite
       ];
