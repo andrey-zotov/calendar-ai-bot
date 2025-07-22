@@ -16,6 +16,7 @@ console.log("Calendar AI Bot // Version 1.0.0");
 // - WHITELISTED_EMAILS: Comma-separated list of allowed sender emails
 // - ALLOW_PLUS_SIGN: Enables support for plus sign suffixes
 // - DEFAULT_TIMEZONE: Timezone for event times (default: Europe/London)
+// - REQUIRE_DKIM_VERIFICATION: Require DKIM verification to pass before processing (default: false)
 // - EMAIL_BUCKET: S3 bucket name where SES stores emails
 // - EMAIL_KEY_PREFIX: S3 key name prefix where SES stores email
 
@@ -28,6 +29,7 @@ const getConfig = () => ({
   emailKeyPrefix: process.env.EMAIL_KEY_PREFIX || "emails/",
   allowPlusSign: process.env.ALLOW_PLUS_SIGN !== 'false',
   defaultTimezone: process.env.DEFAULT_TIMEZONE || 'Europe/London',
+  requireDkimVerification: process.env.REQUIRE_DKIM_VERIFICATION === 'true',
   whitelistedEmails: process.env.WHITELISTED_EMAILS ?
       process.env.WHITELISTED_EMAILS.split(',').map(email => email.trim().toLowerCase()) : []
 });
@@ -119,6 +121,94 @@ function isInvitationResponse(data) {
 
   return false;
 }
+
+/**
+ * Checks DKIM verification status from the email headers.
+ *
+ * @param {object} data - Data bundle with context, email, etc.
+ *
+ * @return {object} - Promise resolved with data.
+ */
+exports.checkDkimVerification = function(data) {
+  // Skip processing if early termination was requested
+  if (data.earlyTermination) {
+    return Promise.resolve(data);
+  }
+
+  // If DKIM verification is not required, skip this check
+  if (!data.config.requireDkimVerification) {
+    data.log({
+      message: "DKIM verification not required. Skipping check.",
+      level: "info"
+    });
+    return Promise.resolve(data);
+  }
+
+  // Check if we have email data with headers
+  if (!data.emailData) {
+    data.log({
+      message: "No email data available for DKIM verification check.",
+      level: "warn"
+    });
+    return Promise.resolve(data);
+  }
+
+  // Extract Authentication-Results header
+  const authResultsMatch = data.emailData.match(/^authentication-results:\s*(.*)/mi);
+
+  if (!authResultsMatch) {
+    data.log({
+      message: "No Authentication-Results header found. DKIM verification required but not available.",
+      level: "error",
+      senderEmail: data.senderEmail
+    });
+    data.earlyTermination = true;
+    data.callback();
+    return Promise.resolve(data);
+  }
+
+  const authResults = authResultsMatch[1].toLowerCase();
+
+  // Check for DKIM pass status
+  // Common formats:
+  // - "dkim=pass"
+  // - "dkim=pass (1024-bit key)"
+  // - "dkim=pass header.d=example.com"
+  const dkimPassPattern = /dkim\s*=\s*pass/i;
+
+  if (dkimPassPattern.test(authResults)) {
+    data.log({
+      message: `DKIM verification passed for ${data.senderEmail}`,
+      level: "info",
+      authResults: authResults
+    });
+    return Promise.resolve(data);
+  }
+
+  // Check for DKIM fail or other non-pass statuses
+  const dkimFailPattern = /dkim\s*=\s*(fail|none|neutral|policy|permerror|temperror)/i;
+
+  if (dkimFailPattern.test(authResults)) {
+    data.log({
+      message: `DKIM verification failed for ${data.senderEmail}. Email rejected.`,
+      level: "warn",
+      authResults: authResults
+    });
+    data.earlyTermination = true;
+    data.callback();
+    return Promise.resolve(data);
+  }
+
+  // If DKIM is not mentioned in auth results, treat as failed when verification is required
+  data.log({
+    message: `No DKIM information found in Authentication-Results for ${data.senderEmail}. Email rejected.`,
+    level: "warn",
+    authResults: authResults
+  });
+  data.earlyTermination = true;
+  data.callback();
+  return Promise.resolve(data);
+};
 
 /**
  * Checks if the sender email is in the whitelist and filters out invitation responses.
@@ -606,6 +696,7 @@ exports.handler = function(event, context, callback, overrides) {
         exports.parseEvent,
         exports.checkWhitelist,
         exports.fetchMessage,
+        exports.checkDkimVerification,
         exports.parseEventDetails,
         exports.sendCalendarInvite
       ];
