@@ -40,11 +40,10 @@ const getConfig = () => ({
  * Creates a simple logger that respects the configured log level and formats for CloudWatch.
  *
  * @param {string} logLevel - The logging level: 'DEBUG', 'INFO', or 'ERROR'
- * @param {function} baseLogger - The base logging function (usually console.log)
  *
  * @return {function} - Smart logging function
  */
-function createLogger(logLevel, baseLogger) {
+function createLogger(logLevel) {
   const levels = { DEBUG: 0, INFO: 1, ERROR: 2 };
   const currentLevel = levels[logLevel.toUpperCase()] || levels.INFO;
 
@@ -53,7 +52,7 @@ function createLogger(logLevel, baseLogger) {
     const entryLevelNum = levels[entryLevel] || levels.INFO;
 
     if (entryLevelNum >= currentLevel) {
-      const { level, message, ...additionalData } = logEntry;
+      const { message, ...additionalData } = logEntry;
 
       // Use appropriate console method for CloudWatch log level recognition
       let logFunction;
@@ -774,7 +773,7 @@ exports.handler = function(event, context, callback, overrides) {
     callback: callback,
     context: context,
     config: overrides && overrides.config ? overrides.config : config,
-    log: overrides && overrides.log ? overrides.log : createLogger(config.logLevel, console.log),
+    log: overrides && overrides.log ? overrides.log : createLogger(config.logLevel),
     ses: overrides && overrides.ses ? overrides.ses : new SESv2Client(),
     s3: overrides && overrides.s3 ?
       overrides.s3 : new S3Client({signatureVersion: 'v4'})
